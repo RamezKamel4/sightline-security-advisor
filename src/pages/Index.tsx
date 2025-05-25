@@ -1,12 +1,38 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState } from 'react';
+import { Sidebar } from '@/components/Sidebar';
+import { Dashboard } from '@/components/Dashboard';
+import { ScanHistory } from '@/components/ScanHistory';
+import { Settings } from '@/components/Settings';
+import { NewScanModal } from '@/components/NewScanModal';
 
 const Index = () => {
+  const [activeView, setActiveView] = useState('dashboard');
+  const [isNewScanOpen, setIsNewScanOpen] = useState(false);
+
+  const renderContent = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return <Dashboard onNewScan={() => setIsNewScanOpen(true)} />;
+      case 'history':
+        return <ScanHistory />;
+      case 'settings':
+        return <Settings />;
+      default:
+        return <Dashboard onNewScan={() => setIsNewScanOpen(true)} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-slate-50 flex">
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <main className="flex-1 p-6">
+        {renderContent()}
+      </main>
+      <NewScanModal 
+        isOpen={isNewScanOpen} 
+        onClose={() => setIsNewScanOpen(false)} 
+      />
     </div>
   );
 };
