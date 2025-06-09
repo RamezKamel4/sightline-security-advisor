@@ -11,6 +11,8 @@ from openai import OpenAI # For OpenAI API
 # Load environment variables from .env file
 load_dotenv() # Add this line
 
+print(f"Attempting to load .env. Key found: {os.getenv('OPENAI_API_KEY')}")
+
 # --- OpenAI API Key Configuration ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Use os.getenv
 
