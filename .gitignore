@@ -28,11 +28,10 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-env/
+
 venv/
 *.egg-info/
 
 # *.log # Already present above
 
-# Environment variables
-.env
+
