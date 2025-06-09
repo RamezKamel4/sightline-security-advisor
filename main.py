@@ -8,6 +8,12 @@ import os # To access environment variables
 from dotenv import load_dotenv # Add this import
 from openai import OpenAI # For OpenAI API
 
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+import traceback
+
+
 # Load environment variables from .env file
 load_dotenv() # Add this line
 
@@ -180,6 +186,10 @@ def fetch_cves_for_service(service_name: str, version: str) -> list:
         return [{"error": f"Error parsing CVE data: {e}", "query": search_query}]
     return cves_list
 
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+import traceback
+
 @app.post("/api/scan")
 async def scan_ip(request: ScanRequest):
     ip_address = request.ip
@@ -189,8 +199,12 @@ async def scan_ip(request: ScanRequest):
     try:
         nm.scan(ip_address, arguments='-sV -T4')
     except nmap.PortScannerError as e:
+        print("Nmap Scanner Error:", e)
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nmap scan error: {e}")
     except Exception as e:
+        print("Unexpected Nmap error:", e)
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during Nmap scan: {e}")
 
     if not nm.all_hosts():
@@ -206,27 +220,29 @@ async def scan_ip(request: ScanRequest):
         product = port_info.get('product', '').strip()
         version_str = port_info.get('version', '').strip()
 
-        # Determine the name and version to use for CVE search and display
         search_service_name = product if product else service_name
-        # Version is only the version string; product is part of search_service_name if available
         search_version = version_str if version_str else "unknown"
-
         display_version = f"{product} {version_str}".strip() if product or version_str else 'unknown'
-        # If display_version is empty after stripping, mark as unknown
-        if not display_version: display_version = 'unknown'
-
+        if not display_version:
+            display_version = 'unknown'
 
         service_data = {
             "port": port,
-            "service": service_name, # Original service name from nmap
-            "version": display_version, # Combined product and version for display
+            "service": service_name,
+            "version": display_version,
             "cves": []
         }
 
-        # Fetch CVEs only if we have a meaningful service name
+        # 🔍 Try CVE fetching with detailed debug logging
         if search_service_name != 'unknown':
-            cves = fetch_cves_for_service(search_service_name, search_version)
-            service_data["cves"] = cves
+            try:
+                print(f"Fetching CVEs for: {search_service_name} {search_version}")
+                cves = fetch_cves_for_service(search_service_name, search_version)
+                service_data["cves"] = cves
+            except Exception as e:
+                print("⚠️ Error while fetching CVEs:", e)
+                traceback.print_exc()
+                service_data["cves"] = ["Error fetching CVEs"]
 
         results.append(service_data)
 
