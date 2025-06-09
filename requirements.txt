@@ -7,3 +7,4 @@ openai
 pytest
 httpx
 pytest-asyncio
+python-dotenv

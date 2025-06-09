@@ -5,19 +5,24 @@ import nmap # type: ignore
 import requests # For NVD API
 import urllib.parse # For URL encoding search terms
 import os # To access environment variables
+from dotenv import load_dotenv # Add this import
 from openai import OpenAI # For OpenAI API
 
-# --- OpenAI API Key Configuration ---
-# IMPORTANT: Replace with your actual key or use environment variables.
-# For better security, set OPENAI_API_KEY as an environment variable.
-# Example: export OPENAI_API_KEY='your_key_here'
-# The code will try to use the environment variable first.
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY_FALLBACK")
-if OPENAI_API_KEY == "YOUR_OPENAI_API_KEY_FALLBACK":
-    print("WARNING: OpenAI API key is not set as an environment variable. Using fallback placeholder.")
-    # You might want to raise an error here or handle it depending on your deployment strategy
-    # For this example, we'll allow it to proceed but it won't work without a real key.
+# Load environment variables from .env file
+load_dotenv() # Add this line
 
+# --- OpenAI API Key Configuration ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Use os.getenv
+
+if not OPENAI_API_KEY:
+    print("WARNING: OpenAI API key is not set in the environment or .env file.")
+    # Fallback or error handling if you want the app to run without it for some reason
+    # For this app, it's critical, so we might let it fail later if client is used without key
+    # Or provide a default non-functional key to make client initialization not fail immediately
+    OPENAI_API_KEY = "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET" # Placeholder if not found
+
+# Initialize client - ensure this is AFTER OPENAI_API_KEY is loaded
+# If OPENAI_API_KEY is the fallback, calls to OpenAI will fail, which is expected.
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
@@ -38,10 +43,10 @@ async def read_root():
     return {"message": "VulnScan AI Backend is running"}
 
 def get_gpt_explanation_and_fix(cve_id: str, cve_description: str) -> dict:
-    if OPENAI_API_KEY == "YOUR_OPENAI_API_KEY_FALLBACK":
+    if OPENAI_API_KEY == "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET" or not OPENAI_API_KEY:
         return {
-            "gpt_explanation": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable.",
-            "recommended_fix": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
+            "gpt_explanation": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable or in .env file.",
+            "recommended_fix": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable or in .env file."
         }
     try:
         system_prompt = "You are a cybersecurity expert. Your task is to explain the CVE (Common Vulnerabilities and Exposures) provided and suggest a concise, actionable fix. Focus on practical steps for system administrators or developers."
@@ -153,8 +158,8 @@ def fetch_cves_for_service(service_name: str, version: str) -> list:
                 published_date = cve_item['published']
 
                 # Get GPT explanation and fix, only if not a fallback key
-                gpt_data = {"gpt_explanation": "OpenAI API key not configured.", "recommended_fix": "OpenAI API key not configured."}
-                if OPENAI_API_KEY != "YOUR_OPENAI_API_KEY_FALLBACK":
+                gpt_data = {"gpt_explanation": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable or in .env file.", "recommended_fix": "OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable or in .env file."}
+                if OPENAI_API_KEY != "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET" and OPENAI_API_KEY:
                     gpt_data = get_gpt_explanation_and_fix(cve_id, description)
 
                 cves_list.append({
