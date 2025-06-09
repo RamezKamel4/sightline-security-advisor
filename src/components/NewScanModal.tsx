@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,30 +7,72 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
+import { createScan } from '@/services/scanService';
 
 interface NewScanModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onScanCreated?: () => void;
 }
 
-export const NewScanModal = ({ isOpen, onClose }: NewScanModalProps) => {
+export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalProps) => {
   const [target, setTarget] = useState('');
   const [scanProfile, setScanProfile] = useState('');
   const [scanDepth, setScanDepth] = useState('fast');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [schedule, setSchedule] = useState('now');
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleStartScan = () => {
-    console.log('Starting scan with:', {
-      target,
-      scanProfile,
-      scanDepth,
-      username: username || undefined,
-      password: password || undefined,
-      schedule,
-    });
-    onClose();
+  const handleStartScan = async () => {
+    if (!target || !scanProfile) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in the target and scan profile.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const scanId = await createScan({
+        target,
+        scanProfile,
+        scanDepth,
+        username: username || undefined,
+        password: password || undefined,
+        schedule,
+      });
+
+      toast({
+        title: "Scan Started",
+        description: `Scan ${scanId} has been initiated successfully.`,
+      });
+
+      // Reset form
+      setTarget('');
+      setScanProfile('');
+      setScanDepth('fast');
+      setUsername('');
+      setPassword('');
+      setSchedule('now');
+      
+      onScanCreated?.();
+      onClose();
+    } catch (error) {
+      console.error('Scan error:', error);
+      toast({
+        title: "Scan Failed",
+        description: error instanceof Error ? error.message : "Failed to start scan",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,6 +96,7 @@ export const NewScanModal = ({ isOpen, onClose }: NewScanModalProps) => {
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                     className="mt-1"
+                    disabled={isLoading}
                   />
                   <p className="text-xs text-slate-600 mt-1">
                     Enter an IP address, domain name, or IP range (CIDR notation)
@@ -63,7 +105,7 @@ export const NewScanModal = ({ isOpen, onClose }: NewScanModalProps) => {
 
                 <div>
                   <Label className="text-sm font-medium">Scan Profile</Label>
-                  <Select value={scanProfile} onValueChange={setScanProfile}>
+                  <Select value={scanProfile} onValueChange={setScanProfile} disabled={isLoading}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select scan profile" />
                     </SelectTrigger>
@@ -173,15 +215,15 @@ export const NewScanModal = ({ isOpen, onClose }: NewScanModalProps) => {
         <Separator />
 
         <div className="flex justify-end space-x-3">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button 
             onClick={handleStartScan}
-            disabled={!target || !scanProfile}
+            disabled={!target || !scanProfile || isLoading}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Start Scan
+            {isLoading ? 'Starting Scan...' : 'Start Scan'}
           </Button>
         </div>
       </DialogContent>

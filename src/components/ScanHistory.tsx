@@ -1,62 +1,58 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, Search, Filter } from 'lucide-react';
+import { FileText, Download, Search, Filter, Eye } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { ScanResults } from './ScanResults';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+interface Scan {
+  scan_id: string;
+  target: string;
+  profile: string | null;
+  status: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  scan_depth: string | null;
+}
 
 export const ScanHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const mockScans = [
-    {
-      id: 1,
-      target: '192.168.1.0/24',
-      profile: 'Web Applications',
-      status: 'completed',
-      risk: 'high',
-      date: '2025-05-25 10:30',
-      duration: '15m 32s',
-      findings: 23,
-      critical: 3,
-    },
-    {
-      id: 2,
-      target: 'api.company.com',
-      profile: 'Web Applications',
-      status: 'running',
-      risk: 'medium',
-      date: '2025-05-25 09:15',
-      duration: '8m 45s',
-      findings: 12,
-      critical: 0,
-    },
-    {
-      id: 3,
-      target: '10.0.0.0/16',
-      profile: 'Comprehensive',
-      status: 'completed',
-      risk: 'low',
-      date: '2025-05-24 16:45',
-      duration: '45m 12s',
-      findings: 8,
-      critical: 0,
-    },
-    {
-      id: 4,
-      target: 'db.internal.com',
-      profile: 'Databases',
-      status: 'failed',
-      risk: 'unknown',
-      date: '2025-05-24 14:20',
-      duration: '2m 10s',
-      findings: 0,
-      critical: 0,
-    },
-  ];
+  useEffect(() => {
+    fetchScans();
+  }, []);
+
+  const fetchScans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scans')
+        .select('*')
+        .order('start_time', { ascending: false });
+
+      if (error) throw error;
+      setScans(data || []);
+    } catch (error) {
+      console.error('Error fetching scans:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load scan history",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -68,15 +64,25 @@ export const ScanHistory = () => {
     return variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800';
   };
 
-  const getRiskBadge = (risk: string) => {
-    const variants = {
-      high: 'bg-red-100 text-red-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      low: 'bg-green-100 text-green-800',
-      unknown: 'bg-gray-100 text-gray-800',
-    };
-    return variants[risk as keyof typeof variants] || 'bg-gray-100 text-gray-800';
+  const formatDuration = (startTime: string | null, endTime: string | null) => {
+    if (!startTime || !endTime) return 'N/A';
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diffMs = end.getTime() - start.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffSecs = Math.floor((diffMs % 60000) / 1000);
+    return `${diffMins}m ${diffSecs}s`;
   };
+
+  const filteredScans = scans.filter(scan => {
+    const matchesSearch = scan.target.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || scan.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  if (loading) {
+    return <div className="p-6">Loading scan history...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -124,49 +130,44 @@ export const ScanHistory = () => {
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Target</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Profile</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-600">Risk</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Duration</th>
-                  <th className="text-left py-3 px-4 font-medium text-slate-600">Findings</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {mockScans.map((scan) => (
-                  <tr key={scan.id} className="border-b border-slate-100 hover:bg-slate-50">
+                {filteredScans.map((scan) => (
+                  <tr key={scan.scan_id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-4 px-4">
                       <div className="font-medium text-slate-900">{scan.target}</div>
                     </td>
-                    <td className="py-4 px-4 text-slate-600">{scan.profile}</td>
+                    <td className="py-4 px-4 text-slate-600">{scan.profile || 'Unknown'}</td>
                     <td className="py-4 px-4">
-                      <Badge className={getStatusBadge(scan.status)}>
-                        {scan.status}
+                      <Badge className={getStatusBadge(scan.status || 'unknown')}>
+                        {scan.status || 'unknown'}
                       </Badge>
                     </td>
-                    <td className="py-4 px-4">
-                      <Badge className={getRiskBadge(scan.risk)}>
-                        {scan.risk}
-                      </Badge>
+                    <td className="py-4 px-4 text-slate-600">
+                      {scan.start_time ? new Date(scan.start_time).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="py-4 px-4 text-slate-600">{scan.date}</td>
-                    <td className="py-4 px-4 text-slate-600">{scan.duration}</td>
-                    <td className="py-4 px-4">
-                      <div className="text-slate-900">
-                        {scan.findings} total
-                        {scan.critical > 0 && (
-                          <div className="text-xs text-red-600">{scan.critical} critical</div>
-                        )}
-                      </div>
+                    <td className="py-4 px-4 text-slate-600">
+                      {formatDuration(scan.start_time, scan.end_time)}
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex space-x-2">
+                        {scan.status === 'completed' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => setSelectedScanId(scan.scan_id)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline">
                           <FileText className="h-4 w-4 mr-1" />
                           Report
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Download className="h-4 w-4 mr-1" />
-                          PDF
                         </Button>
                       </div>
                     </td>
@@ -177,6 +178,15 @@ export const ScanHistory = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedScanId} onOpenChange={() => setSelectedScanId(null)}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Scan Results</DialogTitle>
+          </DialogHeader>
+          {selectedScanId && <ScanResults scanId={selectedScanId} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

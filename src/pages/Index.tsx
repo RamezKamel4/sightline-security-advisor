@@ -11,6 +11,7 @@ import { NewScanModal } from '@/components/NewScanModal';
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isNewScanOpen, setIsNewScanOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -20,12 +21,16 @@ const Index = () => {
     }
   }, [user, navigate]);
 
+  const handleScanCreated = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard onNewScan={() => setIsNewScanOpen(true)} />;
       case 'history':
-        return <ScanHistory />;
+        return <ScanHistory key={refreshKey} />;
       case 'settings':
         return <Settings />;
       default:
@@ -34,7 +39,7 @@ const Index = () => {
   };
 
   if (!user) {
-    return null; // This will be handled by the redirect in useEffect
+    return null;
   }
 
   return (
@@ -45,7 +50,8 @@ const Index = () => {
       </main>
       <NewScanModal 
         isOpen={isNewScanOpen} 
-        onClose={() => setIsNewScanOpen(false)} 
+        onClose={() => setIsNewScanOpen(false)}
+        onScanCreated={handleScanCreated}
       />
     </div>
   );
