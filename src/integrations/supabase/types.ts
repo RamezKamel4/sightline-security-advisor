@@ -41,7 +41,7 @@ export type Database = {
         }
         Insert: {
           cve_id?: string | null
-          finding_id: string
+          finding_id?: string
           port: number
           scan_id: string
           service_name: string
@@ -85,7 +85,7 @@ export type Database = {
           created_at?: string
           fix_recommendations?: string | null
           pdf_url?: string | null
-          report_id: string
+          report_id?: string
           scan_id: string
           summary?: string | null
         }
@@ -122,7 +122,7 @@ export type Database = {
           end_time?: string | null
           profile?: string | null
           scan_depth?: string | null
-          scan_id: string
+          scan_id?: string
           start_time?: string | null
           status?: string | null
           target: string
