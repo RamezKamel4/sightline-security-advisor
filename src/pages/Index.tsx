@@ -1,5 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { ScanHistory } from '@/components/ScanHistory';
@@ -9,6 +11,14 @@ import { NewScanModal } from '@/components/NewScanModal';
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isNewScanOpen, setIsNewScanOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+    }
+  }, [user, navigate]);
 
   const renderContent = () => {
     switch (activeView) {
@@ -22,6 +32,10 @@ const Index = () => {
         return <Dashboard onNewScan={() => setIsNewScanOpen(true)} />;
     }
   };
+
+  if (!user) {
+    return null; // This will be handled by the redirect in useEffect
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex">

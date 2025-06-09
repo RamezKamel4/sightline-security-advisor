@@ -1,6 +1,8 @@
 
 import React from 'react';
-import { Shield, Plus, FileText, Settings as SettingsIcon } from 'lucide-react';
+import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface SidebarProps {
   activeView: string;
@@ -8,11 +10,17 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
+  const { signOut, user } = useAuth();
+  
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Shield },
     { id: 'history', label: 'Scan History', icon: FileText },
     { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <div className="w-64 bg-slate-900 text-white flex flex-col">
@@ -49,11 +57,27 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
         </ul>
       </nav>
       
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-slate-700 space-y-4">
+        {user && (
+          <div className="text-center">
+            <p className="text-slate-400 text-sm mb-2">Logged in as:</p>
+            <p className="text-white text-sm font-medium truncate">{user.email}</p>
+          </div>
+        )}
+        
         <div className="bg-slate-800 rounded-lg p-4 text-center">
           <div className="text-slate-400 text-sm mb-2">Scans this month</div>
           <div className="text-2xl font-bold text-green-400">47</div>
         </div>
+        
+        <Button 
+          onClick={handleSignOut}
+          variant="outline"
+          className="w-full bg-transparent border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
     </div>
   );
