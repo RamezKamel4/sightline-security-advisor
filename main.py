@@ -8,6 +8,9 @@ import os # To access environment variables
 from dotenv import load_dotenv # Add this import
 from openai import OpenAI # For OpenAI API
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -34,6 +37,8 @@ if not OPENAI_API_KEY:
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 app.add_middleware(
     CORSMiddleware,
