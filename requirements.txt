@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-nmap
+pydantic
+requests
+openai
+pytest
+httpx
+pytest-asyncio
