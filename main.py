@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,7 +33,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
 
-# Add CORS middleware before mounting static files
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -264,5 +263,6 @@ async def scan_ip(request: ScanRequest):
     print(f"Scan completed. Found {len(results)} services.")
     return results
 
-# Mount static files after defining all routes
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# Mount static files on /static path instead of root to avoid conflicts
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static", html=True), name="static")
