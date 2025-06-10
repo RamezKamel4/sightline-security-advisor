@@ -21,22 +21,30 @@ serve(async (req) => {
   try {
     const { scanId } = await req.json();
     
-    // Try different possible names for the OpenAI API key, including the one with parentheses
+    console.log('Processing report generation for scanId:', scanId);
+    
+    // Get OpenAI API key with all possible names
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || 
                          Deno.env.get('OPENAI_API_KEY (GPT-4)') ||
                          Deno.env.get('OPENAI_KEY');
 
-    console.log('Available env vars:', Object.keys(Deno.env.toObject()));
+    console.log('Available environment variables:', Object.keys(Deno.env.toObject()));
     console.log('OpenAI API key found:', !!openAIApiKey);
+    console.log('OpenAI API key starts with:', openAIApiKey ? openAIApiKey.substring(0, 7) + '...' : 'NOT_FOUND');
 
     if (!openAIApiKey) {
       console.error('OpenAI API key not found in environment variables');
-      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase Edge Function secrets.');
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key not configured. Please check your Supabase Edge Function secrets.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Fetching scan data for scanId:', scanId);
 
-    // Get scan details and findings
+    // Get scan details
     const { data: scan, error: scanError } = await supabase
       .from('scans')
       .select('*')
@@ -45,11 +53,18 @@ serve(async (req) => {
 
     if (scanError) {
       console.error('Scan fetch error:', scanError);
-      throw new Error('Scan not found');
+      return new Response(JSON.stringify({ 
+        error: 'Scan not found',
+        details: scanError.message 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    console.log('Scan data retrieved:', scan);
+    console.log('Scan data retrieved successfully:', scan);
 
+    // Get findings
     const { data: findings, error: findingsError } = await supabase
       .from('findings')
       .select('*')
@@ -57,12 +72,18 @@ serve(async (req) => {
 
     if (findingsError) {
       console.error('Findings fetch error:', findingsError);
-      throw new Error('Failed to fetch findings');
+      return new Response(JSON.stringify({ 
+        error: 'Failed to fetch findings',
+        details: findingsError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Findings retrieved:', findings?.length || 0, 'findings');
 
-    // Prepare findings summary for AI
+    // Prepare findings summary
     const findingsSummary = findings && findings.length > 0 
       ? findings.map(finding => 
           `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''} ${finding.cve_id ? `(CVE: ${finding.cve_id})` : ''}`
@@ -83,16 +104,16 @@ Please provide:
 
 Use simple, non-technical language that business stakeholders can understand. Focus on the impact and solutions rather than technical jargon.`;
 
-    console.log('Calling OpenAI API...');
+    console.log('Calling OpenAI API with model gpt-4o-mini...');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o', // Updated to valid model name
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
           { role: 'user', content: prompt }
@@ -102,30 +123,37 @@ Use simple, non-technical language that business stakeholders can understand. Fo
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
+    console.log('OpenAI response status:', openAIResponse.status);
+
+    if (!openAIResponse.ok) {
+      const errorText = await openAIResponse.text();
+      console.error('OpenAI API error:', openAIResponse.status, errorText);
       
-      // Parse error for better user feedback
-      let errorMessage = `OpenAI API error: ${response.status}`;
+      let errorMessage = `OpenAI API error (${openAIResponse.status})`;
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error?.message) {
           errorMessage = errorData.error.message;
         }
       } catch (e) {
-        errorMessage += ` - ${errorText}`;
+        errorMessage += `: ${errorText}`;
       }
       
-      throw new Error(errorMessage);
+      return new Response(JSON.stringify({ 
+        error: errorMessage,
+        details: errorText 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const aiData = await response.json();
+    const aiData = await openAIResponse.json();
     const reportContent = aiData.choices[0].message.content;
 
-    console.log('AI report generated successfully');
+    console.log('AI report generated successfully, length:', reportContent.length);
 
-    // Store the report with upsert to handle duplicates
+    // Store the report
     const { error: reportError } = await supabase
       .from('reports')
       .upsert({
@@ -139,20 +167,31 @@ Use simple, non-technical language that business stakeholders can understand. Fo
 
     if (reportError) {
       console.error('Report storage error:', reportError);
-      throw new Error('Failed to save report');
+      return new Response(JSON.stringify({ 
+        error: 'Failed to save report',
+        details: reportError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Report saved to database successfully');
 
-    return new Response(JSON.stringify({ success: true, report: reportContent }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      report: reportContent,
+      message: 'Report generated successfully' 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error generating report:', error);
+    console.error('Unexpected error in generate-report function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message,
-      details: error.stack 
+      error: 'Internal server error',
+      details: error.message,
+      stack: error.stack 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

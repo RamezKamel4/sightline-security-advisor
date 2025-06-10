@@ -144,34 +144,45 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 };
 
 export const generateReport = async (scanId: string): Promise<void> => {
-  console.log('Starting report generation for scan:', scanId);
+  console.log('🚀 Starting report generation for scan:', scanId);
   
   try {
+    console.log('📡 Calling generate-report edge function...');
+    
     // Call the edge function to generate AI report
     const { data, error } = await supabase.functions.invoke('generate-report', {
       body: { scanId }
     });
 
-    console.log('Edge function response:', { data, error });
+    console.log('📋 Edge function response received:', { data, error });
 
     if (error) {
-      console.error('Edge function error details:', error);
+      console.error('❌ Edge function error details:', error);
       
-      // Try to extract meaningful error message
+      // Extract meaningful error message
       let errorMessage = 'Failed to generate report';
       
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
+      if (typeof error === 'string') {
         errorMessage = error;
-      } else if (error.context && error.context.error) {
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.context?.error) {
         errorMessage = error.context.error;
       }
       
       throw new Error(errorMessage);
     }
 
-    // Verify report was actually created
+    // Check if the response indicates success
+    if (data && data.error) {
+      console.error('❌ Error in response data:', data.error);
+      throw new Error(data.error);
+    }
+
+    console.log('✅ Edge function completed successfully');
+
+    // Verify report was actually created in database
+    console.log('🔍 Verifying report creation in database...');
     const { data: report, error: dbError } = await supabase
       .from('reports')
       .select('*')
@@ -179,19 +190,24 @@ export const generateReport = async (scanId: string): Promise<void> => {
       .maybeSingle();
 
     if (dbError) {
-      console.error('Database verification error:', dbError);
-      throw new Error('Failed to verify report creation');
+      console.error('❌ Database verification error:', dbError);
+      throw new Error('Failed to verify report creation in database');
     }
 
     if (!report) {
-      throw new Error('Report was not created successfully');
+      console.error('❌ Report not found in database after generation');
+      throw new Error('Report was not created successfully - not found in database');
     }
 
-    console.log('Report generated and verified successfully');
+    console.log('🎉 Report generated and verified successfully:', report.report_id);
   } catch (error) {
-    console.error('Report generation failed:', error);
-    throw new Error(
-      error instanceof Error ? error.message : 'Report generation failed'
-    );
+    console.error('💥 Report generation failed:', error);
+    
+    // Re-throw with a user-friendly message
+    const friendlyMessage = error instanceof Error 
+      ? error.message 
+      : 'An unexpected error occurred during report generation';
+    
+    throw new Error(friendlyMessage);
   }
 };
