@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ScanResult {
@@ -36,13 +35,13 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   console.log('✅ User authenticated:', user.id);
 
-  // Create scan record in database
+  // Create scan record in database - the scan_id will be auto-generated with the new format
   console.log('💾 Creating scan record in database...');
   const { data: scan, error } = await supabase
     .from('scans')
     .insert({
       target: scanData.target,
-      profile: scanData.scanProfile, // Use the profile directly from frontend
+      profile: scanData.scanProfile,
       scan_depth: scanData.scanDepth,
       status: 'running',
       start_time: new Date().toISOString(),
@@ -75,7 +74,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        ip: scanData.target,
+        ip_address: scanData.target,
         nmap_args: nmapArgs,
         scan_profile: scanData.scanProfile
       }),
