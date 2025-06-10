@@ -144,15 +144,54 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 };
 
 export const generateReport = async (scanId: string): Promise<void> => {
-  // Call the edge function to generate AI report
-  const { data, error } = await supabase.functions.invoke('generate-report', {
-    body: { scanId }
-  });
+  console.log('Starting report generation for scan:', scanId);
+  
+  try {
+    // Call the edge function to generate AI report
+    const { data, error } = await supabase.functions.invoke('generate-report', {
+      body: { scanId }
+    });
 
-  if (error) {
-    console.error('Error generating report:', error);
-    throw new Error('Failed to generate report');
+    console.log('Edge function response:', { data, error });
+
+    if (error) {
+      console.error('Edge function error details:', error);
+      
+      // Try to extract meaningful error message
+      let errorMessage = 'Failed to generate report';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error.context && error.context.error) {
+        errorMessage = error.context.error;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    // Verify report was actually created
+    const { data: report, error: dbError } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('scan_id', scanId)
+      .maybeSingle();
+
+    if (dbError) {
+      console.error('Database verification error:', dbError);
+      throw new Error('Failed to verify report creation');
+    }
+
+    if (!report) {
+      throw new Error('Report was not created successfully');
+    }
+
+    console.log('Report generated and verified successfully');
+  } catch (error) {
+    console.error('Report generation failed:', error);
+    throw new Error(
+      error instanceof Error ? error.message : 'Report generation failed'
+    );
   }
-
-  console.log('Report generated successfully');
 };

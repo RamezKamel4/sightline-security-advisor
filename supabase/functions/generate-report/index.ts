@@ -92,7 +92,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o', // Updated to valid model name
         messages: [
           { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
           { role: 'user', content: prompt }
@@ -105,7 +105,19 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      
+      // Parse error for better user feedback
+      let errorMessage = `OpenAI API error: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        }
+      } catch (e) {
+        errorMessage += ` - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const aiData = await response.json();
@@ -113,13 +125,16 @@ Use simple, non-technical language that business stakeholders can understand. Fo
 
     console.log('AI report generated successfully');
 
-    // Store the report
+    // Store the report with upsert to handle duplicates
     const { error: reportError } = await supabase
       .from('reports')
-      .insert({
+      .upsert({
         scan_id: scanId,
         summary: reportContent,
-        fix_recommendations: reportContent // For now, using the same content
+        fix_recommendations: extractRecommendations(reportContent),
+        created_at: new Date().toISOString()
+      }, {
+        onConflict: 'scan_id'
       });
 
     if (reportError) {
@@ -135,9 +150,22 @@ Use simple, non-technical language that business stakeholders can understand. Fo
 
   } catch (error) {
     console.error('Error generating report:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.stack 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
+
+// Helper function to extract recommendations from AI response
+function extractRecommendations(content: string): string {
+  const sections = content.split('\n\n');
+  const recommendationsSection = sections.find(section => 
+    section.toLowerCase().includes('recommended actions') || 
+    section.toLowerCase().includes('recommendations')
+  );
+  return recommendationsSection || content;
+}
