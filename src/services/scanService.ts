@@ -17,15 +17,6 @@ export interface ScanRequest {
   schedule: string;
 }
 
-// Map frontend profile names to database-compatible values
-// These need to match the exact values allowed by the scans_profile_check constraint
-const profileMapping: Record<string, string> = {
-  'web-apps': 'web_applications',
-  'databases': 'databases', 
-  'remote-access': 'remote_access',
-  'comprehensive': 'comprehensive'
-};
-
 // Map scan depth to actual nmap arguments
 const scanDepthMapping: Record<string, string> = {
   'fast': '-T4 --top-ports 1000',
@@ -45,24 +36,13 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   console.log('✅ User authenticated:', user.id);
 
-  // Map the profile to database-compatible format
-  const dbProfile = profileMapping[scanData.scanProfile];
-  
-  if (!dbProfile) {
-    console.error('❌ Invalid scan profile:', scanData.scanProfile);
-    console.log('Available profiles:', Object.keys(profileMapping));
-    throw new Error(`Invalid scan profile: ${scanData.scanProfile}`);
-  }
-  
-  console.log('📊 Mapped profile from', scanData.scanProfile, 'to', dbProfile);
-
   // Create scan record in database
   console.log('💾 Creating scan record in database...');
   const { data: scan, error } = await supabase
     .from('scans')
     .insert({
       target: scanData.target,
-      profile: dbProfile,
+      profile: scanData.scanProfile, // Use the profile directly from frontend
       scan_depth: scanData.scanDepth,
       status: 'running',
       start_time: new Date().toISOString(),
