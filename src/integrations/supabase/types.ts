@@ -138,15 +138,7 @@ export type Database = {
           target?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "scans_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
       users: {
         Row: {
