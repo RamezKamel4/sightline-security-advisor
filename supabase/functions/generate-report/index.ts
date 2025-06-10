@@ -24,10 +24,10 @@ serve(async (req) => {
     console.log('Processing report generation for scanId:', scanId);
     
     // Get OpenAI API key with better debugging
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const openAIApiKey = Deno.env.get('OPENAI_KEY_New');
     
     console.log('Environment variables check:');
-    console.log('- OPENAI_API_KEY exists:', !!openAIApiKey);
+    console.log('- OPENAI_KEY_New exists:', !!openAIApiKey);
     if (openAIApiKey) {
       console.log('- API key length:', openAIApiKey.length);
       console.log('- API key starts with:', openAIApiKey.substring(0, 7) + '...');
@@ -37,7 +37,7 @@ serve(async (req) => {
     if (!openAIApiKey) {
       console.error('OpenAI API key not found');
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured in Supabase secrets. Please add OPENAI_API_KEY to your project secrets.' 
+        error: 'OpenAI API key not configured in Supabase secrets. Please add OPENAI_KEY_New to your project secrets.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

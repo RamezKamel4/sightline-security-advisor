@@ -6,10 +6,10 @@ from openai import OpenAI
 # Load environment variables from .env file
 load_dotenv()
 
-print(f"Attempting to load .env. Key found: {os.getenv('OPENAI_API_KEY')}")
+print(f"Attempting to load .env. Key found: {os.getenv('OPENAI_KEY_New')}")
 
 # --- OpenAI API Key Configuration ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_KEY_New")
 
 if not OPENAI_API_KEY:
     print("WARNING: OpenAI API key is not set in the environment or .env file.")
