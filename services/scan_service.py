@@ -1,4 +1,3 @@
-
 import nmap
 import traceback
 from fastapi import HTTPException
@@ -19,14 +18,14 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str) -> 
         nm.scan(ip_address, arguments=nmap_args)
         
         print(f"📊 Scan completed. Found hosts: {nm.all_hosts()}")
-        
+
         if not nm.all_hosts():
             print(f"❌ No hosts found for {ip_address}")
             raise HTTPException(status_code=404, detail=f"Host {ip_address} not found or not scannable.")
 
-        host = nm.all_hosts()[0]
+        host = str(nm.all_hosts()[0])  # ✅ Force to string
         print(f"🏠 Processing host: {host}")
-        
+
         if host not in nm:
             print(f"❌ Host {host} not in scan results")
             return {"message": f"Host {ip_address} did not respond to scan probes."}
