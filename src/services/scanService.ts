@@ -1,11 +1,6 @@
-import { supabase } from '@/integrations/supabase/client';
 
-export interface ScanResult {
-  port: number;
-  service: string;
-  version: string;
-  cves: any[];
-}
+import { supabase } from '@/integrations/supabase/client';
+import { executeScan, type ScanResult } from './scanApi';
 
 export interface ScanRequest {
   target: string;
@@ -15,13 +10,6 @@ export interface ScanRequest {
   password?: string;
   schedule: string;
 }
-
-// Map scan depth to actual nmap arguments
-const scanDepthMapping: Record<string, string> = {
-  'fast': '-T4 --top-ports 1000',
-  'deep': '-T4 -sV -O',
-  'aggressive': '-T4 -A -sC -sV --script vuln'
-};
 
 export const createScan = async (scanData: ScanRequest): Promise<string> => {
   console.log('🚀 Starting createScan with data:', scanData);
@@ -59,37 +47,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // Start the actual scan
   try {
-    // Get the nmap arguments based on scan depth
-    const nmapArgs = scanDepthMapping[scanData.scanDepth] || '-T4';
-    
-    console.log('🔍 Starting backend scan with args:', nmapArgs);
-
-    // Try to connect to local FastAPI backend
-    const backendUrl = 'http://localhost:8000/api/scan';
-    console.log('🌐 Connecting to backend at:', backendUrl);
-    
-    const response = await fetch(backendUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        ip_address: scanData.target,
-        nmap_args: nmapArgs,
-        scan_profile: scanData.scanProfile
-      }),
-    });
-
-    console.log('📡 Backend response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Backend error response:', errorText);
-      throw new Error(`Backend scan failed: ${response.status} - ${errorText}`);
-    }
-
-    const scanResults: ScanResult[] = await response.json();
-    console.log('✅ Scan results received:', scanResults.length, 'services found');
+    const scanResults = await executeScan(scanData.target, scanData.scanDepth, scanData.scanProfile);
     
     // Update scan status to completed
     console.log('💾 Updating scan status to completed...');
@@ -103,21 +61,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
     // Store findings
     console.log('💾 Storing', scanResults.length, 'findings...');
-    for (const result of scanResults) {
-      const { error: findingError } = await supabase
-        .from('findings')
-        .insert({
-          scan_id: scan.scan_id,
-          port: result.port,
-          service_name: result.service,
-          service_version: result.version,
-          cve_id: result.cves.length > 0 ? result.cves[0].id : null
-        });
-      
-      if (findingError) {
-        console.error('❌ Error storing finding:', findingError);
-      }
-    }
+    await storeFindings(scan.scan_id, scanResults);
 
     console.log('🎉 Scan completed successfully:', scan.scan_id);
     return scan.scan_id;
@@ -142,71 +86,23 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
   }
 };
 
-export const generateReport = async (scanId: string): Promise<void> => {
-  console.log('🚀 Starting report generation for scan:', scanId);
-  
-  try {
-    console.log('📡 Calling generate-report edge function...');
+const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
+  for (const result of scanResults) {
+    const { error: findingError } = await supabase
+      .from('findings')
+      .insert({
+        scan_id: scanId,
+        port: result.port,
+        service_name: result.service,
+        service_version: result.version,
+        cve_id: result.cves.length > 0 ? result.cves[0].id : null
+      });
     
-    // Call the edge function to generate AI report
-    const { data, error } = await supabase.functions.invoke('generate-report', {
-      body: { scanId }
-    });
-
-    console.log('📋 Edge function response received:', { data, error });
-
-    if (error) {
-      console.error('❌ Edge function error details:', error);
-      
-      // Extract meaningful error message
-      let errorMessage = 'Failed to generate report';
-      
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      } else if (error.context?.error) {
-        errorMessage = error.context.error;
-      }
-      
-      throw new Error(errorMessage);
+    if (findingError) {
+      console.error('❌ Error storing finding:', findingError);
     }
-
-    // Check if the response indicates success
-    if (data && data.error) {
-      console.error('❌ Error in response data:', data.error);
-      throw new Error(data.error);
-    }
-
-    console.log('✅ Edge function completed successfully');
-
-    // Verify report was actually created in database
-    console.log('🔍 Verifying report creation in database...');
-    const { data: report, error: dbError } = await supabase
-      .from('reports')
-      .select('*')
-      .eq('scan_id', scanId)
-      .maybeSingle();
-
-    if (dbError) {
-      console.error('❌ Database verification error:', dbError);
-      throw new Error('Failed to verify report creation in database');
-    }
-
-    if (!report) {
-      console.error('❌ Report not found in database after generation');
-      throw new Error('Report was not created successfully - not found in database');
-    }
-
-    console.log('🎉 Report generated and verified successfully:', report.report_id);
-  } catch (error) {
-    console.error('💥 Report generation failed:', error);
-    
-    // Re-throw with a user-friendly message
-    const friendlyMessage = error instanceof Error 
-      ? error.message 
-      : 'An unexpected error occurred during report generation';
-    
-    throw new Error(friendlyMessage);
   }
 };
+
+// Re-export report generation for backwards compatibility
+export { generateReport } from './reportService';
