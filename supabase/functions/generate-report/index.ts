@@ -21,9 +21,9 @@ serve(async (req) => {
   try {
     const { scanId } = await req.json();
     
-    // Try different possible names for the OpenAI API key
+    // Try different possible names for the OpenAI API key, including the one with parentheses
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || 
-                         Deno.env.get('OPENAI_API_KEY_GPT_4') ||
+                         Deno.env.get('OPENAI_API_KEY (GPT-4)') ||
                          Deno.env.get('OPENAI_KEY');
 
     console.log('Available env vars:', Object.keys(Deno.env.toObject()));

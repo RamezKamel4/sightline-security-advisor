@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScanResults } from './ScanResults';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { generateReport } from '@/services/scanService';
 
 interface Scan {
   scan_id: string;
@@ -27,6 +28,7 @@ export const ScanHistory = () => {
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,6 +53,25 @@ export const ScanHistory = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async (scanId: string) => {
+    setIsGeneratingReport(scanId);
+    try {
+      await generateReport(scanId);
+      toast({
+        title: "Report Generated",
+        description: "AI-powered security report has been created successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Report Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate report",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingReport(null);
     }
   };
 
@@ -165,9 +186,14 @@ export const ScanHistory = () => {
                             View
                           </Button>
                         )}
-                        <Button size="sm" variant="outline">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleGenerateReport(scan.scan_id)}
+                          disabled={isGeneratingReport === scan.scan_id}
+                        >
                           <FileText className="h-4 w-4 mr-1" />
-                          Report
+                          {isGeneratingReport === scan.scan_id ? 'Generating...' : 'Report'}
                         </Button>
                       </div>
                     </td>
