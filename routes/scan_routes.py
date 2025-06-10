@@ -13,11 +13,11 @@ async def scan_ip(request: ScanRequest):
     """
     try:
         print(f"🔍 Received scan request: {request}")
-        print(f"🎯 Target: {request.ip}")
+        print(f"🎯 Target: {request.ip_address}")
         print(f"⚙️ Args: {request.nmap_args}")
         print(f"📋 Profile: {request.scan_profile}")
         
-        result = perform_network_scan(request.ip, request.nmap_args, request.scan_profile)
+        result = perform_network_scan(request.ip_address, request.nmap_args, request.scan_profile)
         
         print(f"✅ Scan completed, returning: {len(result) if isinstance(result, list) else 'message'} results")
         return result
