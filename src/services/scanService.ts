@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ScanResult {
@@ -32,18 +33,23 @@ const scanDepthMapping: Record<string, string> = {
 };
 
 export const createScan = async (scanData: ScanRequest): Promise<string> => {
+  console.log('🚀 Starting createScan with data:', scanData);
+  
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
+    console.error('❌ User not authenticated');
     throw new Error('User not authenticated');
   }
 
+  console.log('✅ User authenticated:', user.id);
+
   // Map the profile to database-compatible format
   const dbProfile = profileMapping[scanData.scanProfile] || scanData.scanProfile;
-
-  console.log('Creating scan with profile:', dbProfile);
+  console.log('📊 Mapped profile from', scanData.scanProfile, 'to', dbProfile);
 
   // Create scan record in database
+  console.log('💾 Creating scan record in database...');
   const { data: scan, error } = await supabase
     .from('scans')
     .insert({
@@ -58,19 +64,24 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     .single();
 
   if (error) {
-    console.error('Error creating scan:', error);
-    throw new Error('Failed to create scan');
+    console.error('❌ Database error creating scan:', error);
+    throw new Error(`Failed to create scan: ${error.message}`);
   }
+
+  console.log('✅ Scan created in database with ID:', scan.scan_id);
 
   // Start the actual scan
   try {
     // Get the nmap arguments based on scan depth
     const nmapArgs = scanDepthMapping[scanData.scanDepth] || '-T4';
     
-    console.log('Starting scan with nmap args:', nmapArgs);
+    console.log('🔍 Starting backend scan with args:', nmapArgs);
 
     // Try to connect to local FastAPI backend
-    const response = await fetch('http://localhost:8000/api/scan', {
+    const backendUrl = 'http://localhost:8000/api/scan';
+    console.log('🌐 Connecting to backend at:', backendUrl);
+    
+    const response = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -82,13 +93,19 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       }),
     });
 
+    console.log('📡 Backend response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`Backend scan failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Backend error response:', errorText);
+      throw new Error(`Backend scan failed: ${response.status} - ${errorText}`);
     }
 
     const scanResults: ScanResult[] = await response.json();
+    console.log('✅ Scan results received:', scanResults.length, 'services found');
     
     // Update scan status to completed
+    console.log('💾 Updating scan status to completed...');
     await supabase
       .from('scans')
       .update({
@@ -98,8 +115,9 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       .eq('scan_id', scan.scan_id);
 
     // Store findings
+    console.log('💾 Storing', scanResults.length, 'findings...');
     for (const result of scanResults) {
-      await supabase
+      const { error: findingError } = await supabase
         .from('findings')
         .insert({
           scan_id: scan.scan_id,
@@ -108,12 +126,16 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
           service_version: result.version,
           cve_id: result.cves.length > 0 ? result.cves[0].id : null
         });
+      
+      if (findingError) {
+        console.error('❌ Error storing finding:', findingError);
+      }
     }
 
-    console.log('Scan completed successfully:', scan.scan_id);
+    console.log('🎉 Scan completed successfully:', scan.scan_id);
     return scan.scan_id;
   } catch (error) {
-    console.error('Scan execution error:', error);
+    console.error('❌ Scan execution error:', error);
     
     // Update scan status to failed
     await supabase
