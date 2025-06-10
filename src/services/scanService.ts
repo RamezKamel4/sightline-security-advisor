@@ -17,6 +17,21 @@ export interface ScanRequest {
   schedule: string;
 }
 
+// Map frontend profile names to database-compatible values
+const profileMapping: Record<string, string> = {
+  'web-apps': 'web_applications',
+  'databases': 'database_scan',
+  'remote-access': 'remote_access',
+  'comprehensive': 'comprehensive'
+};
+
+// Map scan depth to actual nmap arguments
+const scanDepthMapping: Record<string, string> = {
+  'fast': '-T4 --top-ports 1000',
+  'deep': '-T4 -sV -O',
+  'aggressive': '-T4 -A -sC -sV --script vuln'
+};
+
 export const createScan = async (scanData: ScanRequest): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
   
@@ -24,12 +39,17 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     throw new Error('User not authenticated');
   }
 
+  // Map the profile to database-compatible format
+  const dbProfile = profileMapping[scanData.scanProfile] || scanData.scanProfile;
+
+  console.log('Creating scan with profile:', dbProfile);
+
   // Create scan record in database
   const { data: scan, error } = await supabase
     .from('scans')
     .insert({
       target: scanData.target,
-      profile: scanData.scanProfile,
+      profile: dbProfile,
       scan_depth: scanData.scanDepth,
       status: 'running',
       start_time: new Date().toISOString(),
@@ -45,16 +65,26 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // Start the actual scan
   try {
+    // Get the nmap arguments based on scan depth
+    const nmapArgs = scanDepthMapping[scanData.scanDepth] || '-T4';
+    
+    console.log('Starting scan with nmap args:', nmapArgs);
+
+    // Try to connect to local FastAPI backend
     const response = await fetch('http://localhost:8000/api/scan', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ip: scanData.target }),
+      body: JSON.stringify({ 
+        ip: scanData.target,
+        nmap_args: nmapArgs,
+        scan_profile: scanData.scanProfile
+      }),
     });
 
     if (!response.ok) {
-      throw new Error('Scan failed');
+      throw new Error(`Backend scan failed: ${response.status}`);
     }
 
     const scanResults: ScanResult[] = await response.json();
@@ -84,6 +114,8 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     console.log('Scan completed successfully:', scan.scan_id);
     return scan.scan_id;
   } catch (error) {
+    console.error('Scan execution error:', error);
+    
     // Update scan status to failed
     await supabase
       .from('scans')
@@ -92,6 +124,11 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         end_time: new Date().toISOString()
       })
       .eq('scan_id', scan.scan_id);
+    
+    // If it's a network error, provide helpful message
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Cannot connect to scan backend. Make sure the Python FastAPI server is running on localhost:8000');
+    }
     
     throw error;
   }

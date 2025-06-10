@@ -16,24 +16,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 import traceback
 
-
 # Load environment variables from .env file
-load_dotenv() # Add this line
+load_dotenv()
 
 print(f"Attempting to load .env. Key found: {os.getenv('OPENAI_API_KEY')}")
 
 # --- OpenAI API Key Configuration ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Use os.getenv
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
     print("WARNING: OpenAI API key is not set in the environment or .env file.")
-    # Fallback or error handling if you want the app to run without it for some reason
-    # For this app, it's critical, so we might let it fail later if client is used without key
-    # Or provide a default non-functional key to make client initialization not fail immediately
-    OPENAI_API_KEY = "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET" # Placeholder if not found
+    OPENAI_API_KEY = "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET"
 
-# Initialize client - ensure this is AFTER OPENAI_API_KEY is loaded
-# If OPENAI_API_KEY is the fallback, calls to OpenAI will fail, which is expected.
+# Initialize client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
@@ -50,6 +45,8 @@ app.add_middleware(
 
 class ScanRequest(BaseModel):
     ip: str
+    nmap_args: str = "-T4"  # Default nmap arguments
+    scan_profile: str = "basic"  # Scan profile for reference
 
 @app.get("/")
 async def read_root():
@@ -198,11 +195,17 @@ import traceback
 @app.post("/api/scan")
 async def scan_ip(request: ScanRequest):
     ip_address = request.ip
+    nmap_args = request.nmap_args
+    scan_profile = request.scan_profile
+    
+    print(f"Starting scan on {ip_address} with profile: {scan_profile}, args: {nmap_args}")
+    
     nm = nmap.PortScanner()
     results = []
 
     try:
-        nm.scan(ip_address, arguments='-sV -T4')
+        # Use the provided nmap arguments for the scan
+        nm.scan(ip_address, arguments=nmap_args)
     except nmap.PortScannerError as e:
         print("Nmap Scanner Error:", e)
         traceback.print_exc()
@@ -238,7 +241,7 @@ async def scan_ip(request: ScanRequest):
             "cves": []
         }
 
-        # 🔍 Try CVE fetching with detailed debug logging
+        # Try CVE fetching with detailed debug logging
         if search_service_name != 'unknown':
             try:
                 print(f"Fetching CVEs for: {search_service_name} {search_version}")
@@ -254,4 +257,5 @@ async def scan_ip(request: ScanRequest):
     if not results:
         return {"message": f"No services with version information found on {ip_address}."}
 
+    print(f"Scan completed. Found {len(results)} services.")
     return results
