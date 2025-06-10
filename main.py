@@ -17,8 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(scan_router)
+# Include API routers BEFORE mounting static files
+app.include_router(scan_router, prefix="", tags=["scan"])
 
 @app.get("/")
 async def read_root():
@@ -28,6 +28,6 @@ async def read_root():
 async def health_check():
     return {"status": "healthy"}
 
-# Mount static files on /static path instead of root to avoid conflicts
+# Mount static files AFTER API routes to avoid conflicts
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static", html=True), name="static")
