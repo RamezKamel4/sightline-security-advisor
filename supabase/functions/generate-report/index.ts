@@ -20,11 +20,21 @@ serve(async (req) => {
 
   try {
     const { scanId } = await req.json();
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    // Try different possible names for the OpenAI API key
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || 
+                         Deno.env.get('OPENAI_API_KEY_GPT_4') ||
+                         Deno.env.get('OPENAI_KEY');
+
+    console.log('Available env vars:', Object.keys(Deno.env.toObject()));
+    console.log('OpenAI API key found:', !!openAIApiKey);
 
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.error('OpenAI API key not found in environment variables');
+      throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase Edge Function secrets.');
     }
+
+    console.log('Fetching scan data for scanId:', scanId);
 
     // Get scan details and findings
     const { data: scan, error: scanError } = await supabase
@@ -34,8 +44,11 @@ serve(async (req) => {
       .single();
 
     if (scanError) {
+      console.error('Scan fetch error:', scanError);
       throw new Error('Scan not found');
     }
+
+    console.log('Scan data retrieved:', scan);
 
     const { data: findings, error: findingsError } = await supabase
       .from('findings')
@@ -43,13 +56,18 @@ serve(async (req) => {
       .eq('scan_id', scanId);
 
     if (findingsError) {
+      console.error('Findings fetch error:', findingsError);
       throw new Error('Failed to fetch findings');
     }
 
+    console.log('Findings retrieved:', findings?.length || 0, 'findings');
+
     // Prepare findings summary for AI
-    const findingsSummary = findings.map(finding => 
-      `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''} ${finding.cve_id ? `(CVE: ${finding.cve_id})` : ''}`
-    ).join('\n');
+    const findingsSummary = findings && findings.length > 0 
+      ? findings.map(finding => 
+          `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''} ${finding.cve_id ? `(CVE: ${finding.cve_id})` : ''}`
+        ).join('\n')
+      : 'No vulnerabilities found - all scanned services appear to be secure.';
 
     // Generate AI report
     const prompt = `Generate a security scan report for target: ${scan.target}
@@ -65,6 +83,8 @@ Please provide:
 
 Use simple, non-technical language that business stakeholders can understand. Focus on the impact and solutions rather than technical jargon.`;
 
+    console.log('Calling OpenAI API...');
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -72,7 +92,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
           { role: 'user', content: prompt }
@@ -82,8 +102,16 @@ Use simple, non-technical language that business stakeholders can understand. Fo
       }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
     const aiData = await response.json();
     const reportContent = aiData.choices[0].message.content;
+
+    console.log('AI report generated successfully');
 
     // Store the report
     const { error: reportError } = await supabase
@@ -95,8 +123,11 @@ Use simple, non-technical language that business stakeholders can understand. Fo
       });
 
     if (reportError) {
+      console.error('Report storage error:', reportError);
       throw new Error('Failed to save report');
     }
+
+    console.log('Report saved to database successfully');
 
     return new Response(JSON.stringify({ success: true, report: reportContent }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
