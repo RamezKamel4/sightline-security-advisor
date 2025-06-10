@@ -31,3 +31,9 @@ async def scan_ip(request: ScanRequest):
 async def test_endpoint():
     """Test endpoint to verify the API is working"""
     return {"message": "Scan API is working", "status": "ok"}
+
+# Add an OPTIONS handler for CORS preflight requests
+@router.options("/scan")
+async def scan_options():
+    """Handle CORS preflight requests"""
+    return {"message": "OK"}

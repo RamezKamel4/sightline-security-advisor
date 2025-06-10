@@ -8,12 +8,12 @@ from routes.scan_routes import router as scan_router
 
 app = FastAPI(title="VulnScan AI Backend", version="1.0.0")
 
-# Add CORS middleware
+# Add CORS middleware with explicit POST method support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
