@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ScanResult {
@@ -20,7 +19,7 @@ export interface ScanRequest {
 // Map frontend profile names to database-compatible values
 const profileMapping: Record<string, string> = {
   'web-apps': 'web_applications',
-  'databases': 'database_scan',
+  'databases': 'databases',
   'remote-access': 'remote_access',
   'comprehensive': 'comprehensive'
 };
