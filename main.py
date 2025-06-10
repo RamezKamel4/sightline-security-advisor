@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -33,8 +34,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
+# Add CORS middleware before mounting static files
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,6 +51,10 @@ class ScanRequest(BaseModel):
 @app.get("/")
 async def read_root():
     return {"message": "VulnScan AI Backend is running"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 def get_gpt_explanation_and_fix(cve_id: str, cve_description: str) -> dict:
     if OPENAI_API_KEY == "YOUR_OPENAI_API_KEY_FALLBACK_IF_NOT_SET" or not OPENAI_API_KEY:
@@ -188,12 +192,11 @@ def fetch_cves_for_service(service_name: str, version: str) -> list:
         return [{"error": f"Error parsing CVE data: {e}", "query": search_query}]
     return cves_list
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-import traceback
-
 @app.post("/api/scan")
 async def scan_ip(request: ScanRequest):
+    """
+    Perform network scan on target IP address
+    """
     ip_address = request.ip
     nmap_args = request.nmap_args
     scan_profile = request.scan_profile
@@ -205,6 +208,7 @@ async def scan_ip(request: ScanRequest):
 
     try:
         # Use the provided nmap arguments for the scan
+        print(f"Executing nmap scan: nmap {nmap_args} {ip_address}")
         nm.scan(ip_address, arguments=nmap_args)
     except nmap.PortScannerError as e:
         print("Nmap Scanner Error:", e)
@@ -259,3 +263,6 @@ async def scan_ip(request: ScanRequest):
 
     print(f"Scan completed. Found {len(results)} services.")
     return results
+
+# Mount static files after defining all routes
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
