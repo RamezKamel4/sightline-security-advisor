@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 # Include API routers BEFORE mounting static files
-app.include_router(scan_router, prefix="", tags=["scan"])
+app.include_router(scan_router, prefix="/api", tags=["scan"])
 
 @app.get("/")
 async def read_root():

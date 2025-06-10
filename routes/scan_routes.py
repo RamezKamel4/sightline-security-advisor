@@ -5,7 +5,7 @@ from services.scan_service import perform_network_scan
 
 router = APIRouter()
 
-@router.post("/api/scan")
+@router.post("/scan")
 async def scan_ip(request: ScanRequest):
     """
     Perform network scan on target IP address
