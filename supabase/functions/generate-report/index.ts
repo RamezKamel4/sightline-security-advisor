@@ -23,23 +23,31 @@ serve(async (req) => {
     
     console.log('Processing report generation for scanId:', scanId);
     
-    // Get OpenAI API key - try multiple possible names
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || 
-                         Deno.env.get('OPENAI_API_KEY (GPT-4)') ||
-                         Deno.env.get('OPENAI_KEY');
-
-    console.log('Available environment variables:', Object.keys(Deno.env.toObject()));
-    console.log('OpenAI API key found:', !!openAIApiKey);
+    // Get OpenAI API key with better debugging
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     
+    console.log('Environment variables check:');
+    console.log('- OPENAI_API_KEY exists:', !!openAIApiKey);
     if (openAIApiKey) {
-      console.log('OpenAI API key starts with:', openAIApiKey.substring(0, 10) + '...');
-      console.log('OpenAI API key length:', openAIApiKey.length);
+      console.log('- API key length:', openAIApiKey.length);
+      console.log('- API key starts with:', openAIApiKey.substring(0, 7) + '...');
+      console.log('- API key format check (should start with sk-):', openAIApiKey.startsWith('sk-'));
     }
 
     if (!openAIApiKey) {
-      console.error('OpenAI API key not found in environment variables');
+      console.error('OpenAI API key not found');
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured. Please check your Supabase Edge Function secrets.' 
+        error: 'OpenAI API key not configured in Supabase secrets. Please add OPENAI_API_KEY to your project secrets.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!openAIApiKey.startsWith('sk-')) {
+      console.error('Invalid OpenAI API key format');
+      return new Response(JSON.stringify({ 
+        error: 'Invalid OpenAI API key format. Key should start with "sk-"' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -66,7 +74,7 @@ serve(async (req) => {
       });
     }
 
-    console.log('Scan data retrieved successfully:', scan);
+    console.log('Scan data retrieved successfully');
 
     // Get findings
     const { data: findings, error: findingsError } = await supabase
@@ -108,16 +116,14 @@ Please provide:
 
 Use simple, non-technical language that business stakeholders can understand. Focus on the impact and solutions rather than technical jargon.`;
 
-    console.log('Calling OpenAI API with gpt-4o-mini...');
-    console.log('Request payload size:', JSON.stringify({
+    console.log('Making OpenAI API request...');
+    console.log('Using model: gpt-4o-mini');
+    console.log('Request payload preview:', {
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
-        { role: 'user', content: prompt }
-      ],
+      messages: 'Generated content',
       max_tokens: 2000,
       temperature: 0.3,
-    }).length, 'characters');
+    });
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -142,36 +148,56 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     if (!openAIResponse.ok) {
       const errorText = await openAIResponse.text();
       console.error('OpenAI API error - Status:', openAIResponse.status);
-      console.error('OpenAI API error - Response:', errorText);
+      console.error('OpenAI API error - Full response:', errorText);
       
-      let errorMessage = `OpenAI API error (${openAIResponse.status})`;
-      let userFriendlyMessage = 'Failed to generate report using AI';
-      
+      let errorData;
       try {
-        const errorData = JSON.parse(errorText);
+        errorData = JSON.parse(errorText);
         console.error('Parsed OpenAI error:', errorData);
-        
-        if (errorData.error?.message) {
-          errorMessage = errorData.error.message;
-          
-          // Provide user-friendly messages for common errors
-          if (errorData.error.code === 'insufficient_quota') {
-            userFriendlyMessage = 'OpenAI API quota exceeded. Please check your OpenAI billing and usage limits.';
-          } else if (errorData.error.code === 'invalid_api_key') {
-            userFriendlyMessage = 'Invalid OpenAI API key. Please check your API key configuration.';
-          } else if (errorData.error.code === 'rate_limit_exceeded') {
-            userFriendlyMessage = 'OpenAI API rate limit exceeded. Please try again in a few minutes.';
-          }
-        }
       } catch (e) {
         console.error('Failed to parse OpenAI error response:', e);
-        errorMessage += `: ${errorText}`;
+      }
+      
+      // Handle specific error cases
+      if (openAIResponse.status === 401) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid OpenAI API key. Please check your API key in Supabase secrets.',
+          details: 'Authentication failed with OpenAI API'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (openAIResponse.status === 429) {
+        const quotaError = errorData?.error?.code === 'insufficient_quota';
+        const rateLimitError = errorData?.error?.code === 'rate_limit_exceeded';
+        
+        if (quotaError) {
+          return new Response(JSON.stringify({ 
+            error: 'OpenAI API quota exceeded. Please add credits to your OpenAI account or upgrade your plan.',
+            details: 'Your OpenAI account has reached its usage limits'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (rateLimitError) {
+          return new Response(JSON.stringify({ 
+            error: 'OpenAI API rate limit exceeded. Please try again in a few minutes.',
+            details: 'Too many requests to OpenAI API'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
       
       return new Response(JSON.stringify({ 
-        error: userFriendlyMessage,
-        details: errorMessage,
-        technical_details: errorText 
+        error: `OpenAI API error (${openAIResponse.status})`,
+        details: errorData?.error?.message || errorText,
+        raw_error: errorText
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -179,7 +205,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     }
 
     const aiData = await openAIResponse.json();
-    console.log('OpenAI response structure:', Object.keys(aiData));
+    console.log('OpenAI response received successfully');
     
     if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
       console.error('Unexpected OpenAI response structure:', aiData);
