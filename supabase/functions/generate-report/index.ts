@@ -23,14 +23,18 @@ serve(async (req) => {
     
     console.log('Processing report generation for scanId:', scanId);
     
-    // Get OpenAI API key with all possible names
+    // Get OpenAI API key - try multiple possible names
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || 
                          Deno.env.get('OPENAI_API_KEY (GPT-4)') ||
                          Deno.env.get('OPENAI_KEY');
 
     console.log('Available environment variables:', Object.keys(Deno.env.toObject()));
     console.log('OpenAI API key found:', !!openAIApiKey);
-    console.log('OpenAI API key starts with:', openAIApiKey ? openAIApiKey.substring(0, 7) + '...' : 'NOT_FOUND');
+    
+    if (openAIApiKey) {
+      console.log('OpenAI API key starts with:', openAIApiKey.substring(0, 10) + '...');
+      console.log('OpenAI API key length:', openAIApiKey.length);
+    }
 
     if (!openAIApiKey) {
       console.error('OpenAI API key not found in environment variables');
@@ -104,7 +108,16 @@ Please provide:
 
 Use simple, non-technical language that business stakeholders can understand. Focus on the impact and solutions rather than technical jargon.`;
 
-    console.log('Calling OpenAI API with model gpt-4o-mini...');
+    console.log('Calling OpenAI API with gpt-4o-mini...');
+    console.log('Request payload size:', JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 2000,
+      temperature: 0.3,
+    }).length, 'characters');
 
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -124,24 +137,41 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     });
 
     console.log('OpenAI response status:', openAIResponse.status);
+    console.log('OpenAI response headers:', Object.fromEntries(openAIResponse.headers.entries()));
 
     if (!openAIResponse.ok) {
       const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', openAIResponse.status, errorText);
+      console.error('OpenAI API error - Status:', openAIResponse.status);
+      console.error('OpenAI API error - Response:', errorText);
       
       let errorMessage = `OpenAI API error (${openAIResponse.status})`;
+      let userFriendlyMessage = 'Failed to generate report using AI';
+      
       try {
         const errorData = JSON.parse(errorText);
+        console.error('Parsed OpenAI error:', errorData);
+        
         if (errorData.error?.message) {
           errorMessage = errorData.error.message;
+          
+          // Provide user-friendly messages for common errors
+          if (errorData.error.code === 'insufficient_quota') {
+            userFriendlyMessage = 'OpenAI API quota exceeded. Please check your OpenAI billing and usage limits.';
+          } else if (errorData.error.code === 'invalid_api_key') {
+            userFriendlyMessage = 'Invalid OpenAI API key. Please check your API key configuration.';
+          } else if (errorData.error.code === 'rate_limit_exceeded') {
+            userFriendlyMessage = 'OpenAI API rate limit exceeded. Please try again in a few minutes.';
+          }
         }
       } catch (e) {
+        console.error('Failed to parse OpenAI error response:', e);
         errorMessage += `: ${errorText}`;
       }
       
       return new Response(JSON.stringify({ 
-        error: errorMessage,
-        details: errorText 
+        error: userFriendlyMessage,
+        details: errorMessage,
+        technical_details: errorText 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -149,11 +179,24 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     }
 
     const aiData = await openAIResponse.json();
+    console.log('OpenAI response structure:', Object.keys(aiData));
+    
+    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
+      console.error('Unexpected OpenAI response structure:', aiData);
+      return new Response(JSON.stringify({ 
+        error: 'Unexpected response from OpenAI API',
+        details: 'Response structure was not as expected'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const reportContent = aiData.choices[0].message.content;
-
     console.log('AI report generated successfully, length:', reportContent.length);
 
     // Store the report
+    console.log('Storing report in database...');
     const { error: reportError } = await supabase
       .from('reports')
       .upsert({
@@ -168,7 +211,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
     if (reportError) {
       console.error('Report storage error:', reportError);
       return new Response(JSON.stringify({ 
-        error: 'Failed to save report',
+        error: 'Failed to save report to database',
         details: reportError.message 
       }), {
         status: 500,
@@ -188,6 +231,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
 
   } catch (error) {
     console.error('Unexpected error in generate-report function:', error);
+    console.error('Error stack trace:', error.stack);
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       details: error.message,
