@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ScanResult {
@@ -17,12 +18,12 @@ export interface ScanRequest {
 }
 
 // Map frontend profile names to database-compatible values
-// The database likely expects these exact values based on the constraint
+// These need to match the exact values allowed by the scans_profile_check constraint
 const profileMapping: Record<string, string> = {
   'web-apps': 'web_applications',
-  'databases': 'database_scan',
-  'remote-access': 'remote_access_scan',
-  'comprehensive': 'full_scan'
+  'databases': 'databases', 
+  'remote-access': 'remote_access',
+  'comprehensive': 'comprehensive'
 };
 
 // Map scan depth to actual nmap arguments
