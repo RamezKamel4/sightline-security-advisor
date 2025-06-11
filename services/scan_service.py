@@ -1,4 +1,5 @@
 
+
 import nmap
 import traceback
 from fastapi import HTTPException
@@ -24,19 +25,23 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str) -> 
             print(f"❌ No hosts found for {ip_address}")
             raise HTTPException(status_code=404, detail=f"Host {ip_address} not found or not scannable.")
 
-        # Ensure host is treated as string - fix the type issue
-        host = str(nm.all_hosts()[0])
-        print(f"🏠 Processing host: {host}")
+        # Get the first host and ensure proper string handling
+        hosts_list = nm.all_hosts()
+        host = hosts_list[0]  # This should already be a string
+        print(f"🏠 Processing host: {host} (type: {type(host)})")
 
-        if host not in nm:
+        # Use a different approach to check if host exists in scan results
+        try:
+            host_data = nm[host]
+        except KeyError:
             print(f"❌ Host {host} not in scan results")
             return [{"message": f"Host {ip_address} did not respond to scan probes."}]
             
-        if 'tcp' not in nm[host]:
+        if 'tcp' not in host_data:
             print(f"ℹ️ No TCP ports found on {host}")
             return [{"message": f"No open TCP ports found on {ip_address}."}]
 
-        tcp_ports = nm[host]['tcp']
+        tcp_ports = host_data['tcp']
         print(f"🔓 Found {len(tcp_ports)} open ports: {list(tcp_ports.keys())}")
 
         for port in tcp_ports:
