@@ -1,4 +1,3 @@
-
 import requests
 import traceback
 from typing import List, Dict, Any
@@ -10,17 +9,21 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
     try:
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
         
-        # Construct search query
+        # Decide how to build search query
         if version and version != "unknown":
             search_query = f"{service_name} {version}"
+            confidence = "high"
+            max_results = 5  # With version we can safely show more results
         else:
             search_query = service_name
+            confidence = "low"  # No version → less accurate results
+            max_results = 3     # Limit results to avoid too many false positives
             
         # NVD API endpoint
         url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         params = {
             "keywordSearch": search_query,
-            "resultsPerPage": 5  # Limit results
+            "resultsPerPage": max_results
         }
         
         print(f"🌐 Querying NVD API with: {search_query}")
@@ -61,10 +64,11 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
                 "id": cve_id,
                 "description": description,
                 "severity": severity,
-                "published": published
+                "published": published,
+                "confidence": confidence  # <── Added confidence flag
             })
         
-        print(f"✅ Found {len(cves)} CVEs for {service_name}")
+        print(f"✅ Found {len(cves)} CVEs for {service_name} ({confidence} confidence)")
         return cves
         
     except requests.exceptions.Timeout:
