@@ -1,33 +1,51 @@
 import requests
 import traceback
 from typing import List, Dict, Any
+from supabase import create_client, Client   # 🚀 NEW
+
+# 🚀 Supabase connection
+SUPABASE_URL = "https://YOUR-PROJECT-URL.supabase.co"
+SUPABASE_KEY = "YOUR-SERVICE-ROLE-KEY"  # use service_role for inserts
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def save_cves_to_supabase(cves: List[Dict[str, Any]]):
+    """
+    Save CVEs into Supabase `cve` table, avoiding duplicates.
+    """
+    for cve in cves:
+        try:
+            supabase.table("cve").upsert({
+                "cve_id": cve["id"],
+                "title": cve.get("title", cve["id"]),
+                "description": cve.get("description", "No description"),
+                "cvss_score": cve.get("cvss", None)
+            }, on_conflict=["cve_id"]).execute()
+            print(f"💾 Saved {cve['id']} into Supabase")
+        except Exception as e:
+            print(f"⚠️ Failed to save {cve['id']} - {e}")
 
 def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, Any]]:
     """
-    Fetch CVEs for a given service and version from NVD API
+    Fetch CVEs for a given service and version from NVD API,
+    then save them to Supabase.
     """
     try:
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
         
-        # Decide how to build search query
+        # Construct search query
         if version and version != "unknown":
             search_query = f"{service_name} {version}"
-            confidence = "high"
-            max_results = 5  # With version we can safely show more results
         else:
             search_query = service_name
-            confidence = "low"  # No version → less accurate results
-            max_results = 3     # Limit results to avoid too many false positives
             
         # NVD API endpoint
         url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         params = {
             "keywordSearch": search_query,
-            "resultsPerPage": max_results
+            "resultsPerPage": 5  # limit results for now
         }
         
         print(f"🌐 Querying NVD API with: {search_query}")
-        
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         
@@ -39,6 +57,9 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
             cve_data = vuln.get("cve", {})
             cve_id = cve_data.get("id", "Unknown")
             
+            # Title or short description
+            title = cve_data.get("id", "Unknown CVE")
+            
             # Get description
             descriptions = cve_data.get("descriptions", [])
             description = "No description available"
@@ -47,28 +68,30 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
                     description = desc.get("value", "No description available")
                     break
             
-            # Get severity
+            # Get severity (CVSS)
             metrics = cve_data.get("metrics", {})
-            severity = "Unknown"
+            cvss = None
             if "cvssMetricV31" in metrics:
-                severity = metrics["cvssMetricV31"][0].get("cvssData", {}).get("baseSeverity", "Unknown")
+                cvss = metrics["cvssMetricV31"][0].get("cvssData", {}).get("baseScore")
             elif "cvssMetricV30" in metrics:
-                severity = metrics["cvssMetricV30"][0].get("cvssData", {}).get("baseSeverity", "Unknown")
+                cvss = metrics["cvssMetricV30"][0].get("cvssData", {}).get("baseScore")
             elif "cvssMetricV2" in metrics:
-                severity = metrics["cvssMetricV2"][0].get("baseSeverity", "Unknown")
+                cvss = metrics["cvssMetricV2"][0].get("cvssData", {}).get("baseScore")
             
-            # Get published date
-            published = cve_data.get("published", "Unknown")
-            
+            # Build CVE record
             cves.append({
                 "id": cve_id,
+                "title": title,
                 "description": description,
-                "severity": severity,
-                "published": published,
-                "confidence": confidence  # <── Added confidence flag
+                "cvss": cvss
             })
         
-        print(f"✅ Found {len(cves)} CVEs for {service_name} ({confidence} confidence)")
+        print(f"✅ Found {len(cves)} CVEs for {service_name}")
+
+        # 🚀 Save to Supabase
+        if cves:
+            save_cves_to_supabase(cves)
+        
         return cves
         
     except requests.exceptions.Timeout:
