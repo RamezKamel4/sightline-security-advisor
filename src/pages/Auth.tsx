@@ -10,10 +10,11 @@ import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -22,24 +23,41 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = isLogin 
-        ? await signIn(email, password)
-        : await signUp(email, password);
-
-      if (error) {
-        toast({
-          title: "Authentication Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        if (isLogin) {
-          navigate('/');
+      if (isResetMode) {
+        const { error } = await resetPassword(email);
+        if (error) {
+          toast({
+            title: "Reset Password Error",
+            description: error.message,
+            variant: "destructive",
+          });
         } else {
           toast({
             title: "Success!",
-            description: "Account created successfully. Please check your email to verify your account.",
+            description: "Password reset email sent. Please check your inbox.",
           });
+          setIsResetMode(false);
+        }
+      } else {
+        const { error } = isLogin 
+          ? await signIn(email, password)
+          : await signUp(email, password);
+
+        if (error) {
+          toast({
+            title: "Authentication Error",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          if (isLogin) {
+            navigate('/');
+          } else {
+            toast({
+              title: "Success!",
+              description: "Account created successfully. Please check your email to verify your account.",
+            });
+          }
         }
       }
     } catch (error) {
@@ -69,7 +87,7 @@ const Auth = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-center">
-              {isLogin ? 'Sign In' : 'Create Account'}
+              {isResetMode ? 'Reset Password' : (isLogin ? 'Sign In' : 'Create Account')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -88,49 +106,89 @@ const Auth = () => {
                 />
               </div>
               
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  minLength={6}
-                />
-              </div>
+              {!isResetMode && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
+                    Password
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              )}
 
               <Button 
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={loading}
               >
-                {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+                {loading ? 'Processing...' : (isResetMode ? 'Send Reset Email' : (isLogin ? 'Sign In' : 'Create Account'))}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                {isLogin 
-                  ? "Don't have an account? Sign up" 
-                  : "Already have an account? Sign in"
-                }
-              </button>
+            <div className="mt-6 text-center space-y-2">
+              {!isResetMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsLogin(!isLogin)}
+                    className="text-blue-600 hover:text-blue-800 text-sm block w-full"
+                  >
+                    {isLogin 
+                      ? "Don't have an account? Sign up" 
+                      : "Already have an account? Sign in"
+                    }
+                  </button>
+                  
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => setIsResetMode(true)}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      Forgot your password?
+                    </button>
+                  )}
+                </>
+              )}
+              
+              {isResetMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetMode(false);
+                    setPassword('');
+                  }}
+                  className="text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  Back to sign in
+                </button>
+              )}
             </div>
 
-            {!isLogin && (
+            {!isLogin && !isResetMode && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <div className="flex items-start space-x-2">
                   <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
                   <p className="text-sm text-blue-800">
                     After signing up, please check your email to verify your account before signing in.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {isResetMode && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <p className="text-sm text-blue-800">
+                    Enter your email address and we'll send you a link to reset your password.
                   </p>
                 </div>
               </div>
