@@ -257,11 +257,11 @@ Use simple, non-technical language that business stakeholders can understand. Fo
 
   } catch (error) {
     console.error('Unexpected error in generate-report function:', error);
-    console.error('Error stack trace:', error.stack);
+    console.error('Error stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      details: error.message,
-      stack: error.stack 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace available'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
