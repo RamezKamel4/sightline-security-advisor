@@ -47,7 +47,11 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // Start the actual scan
   try {
-    const scanResults = await executeScan(scanData.target, scanData.scanDepth, scanData.scanProfile);
+    const scanResults = await executeScan(
+      scanData.target, 
+      scanData.scanDepth as 'fast' | 'deep' | 'aggressive', 
+      scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
+    );
     
     // Update scan status to completed
     console.log('💾 Updating scan status to completed...');

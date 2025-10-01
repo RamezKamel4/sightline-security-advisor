@@ -10,18 +10,18 @@ router = APIRouter()
 async def scan_ip(request: ScanRequest):
     """
     Perform network scan on target IP address
+    Supports follow-up scans when request.follow_up=True
     """
     try:
         print(f"🔍 Received scan request: {request}")
-        print(f"🎯 Target: {request.ip_address}")
-        print(f"⚙️ Args: {request.nmap_args}")
-        print(f"📋 Profile: {request.scan_profile}")
-        
-        result = perform_network_scan(request.ip_address, request.nmap_args, request.scan_profile)
-        
-        print(f"✅ Scan completed, returning: {len(result) if isinstance(result, list) else 'message'} results")
+        result = perform_network_scan(
+            ip_address=request.ip_address,
+            nmap_args=request.nmap_args,
+            scan_profile=request.scan_profile,
+            follow_up=getattr(request, "follow_up", False)
+        )
         return result
-        
+
     except Exception as e:
         print(f"❌ Scan error: {e}")
         traceback.print_exc()
