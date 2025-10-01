@@ -260,11 +260,51 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
       {report && (
         <Card>
           <CardHeader>
-            <CardTitle>AI Security Report</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              AI Security Report
+            </CardTitle>
+            <p className="text-sm text-slate-600 mt-2">
+              Generated on {new Date(report.created_at).toLocaleDateString()} at {new Date(report.created_at).toLocaleTimeString()}
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="prose max-w-none">
-              <pre className="whitespace-pre-wrap text-sm">{report.summary}</pre>
+            <div className="space-y-6">
+              {report.summary?.split('\n\n').map((section, index) => {
+                // Check if section is a header (starts with ** or #)
+                const isHeader = section.trim().startsWith('**') || section.trim().startsWith('#');
+                const cleanSection = section.replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '');
+                
+                if (isHeader) {
+                  return (
+                    <h3 key={index} className="text-lg font-semibold text-slate-900 mt-6 first:mt-0">
+                      {cleanSection}
+                    </h3>
+                  );
+                }
+                
+                // Regular paragraph
+                return (
+                  <div key={index} className="text-slate-700 leading-relaxed">
+                    {section.split('\n').map((line, lineIndex) => {
+                      // Handle bullet points
+                      if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
+                        return (
+                          <div key={lineIndex} className="ml-4 mb-2 flex gap-2">
+                            <span className="text-blue-600 font-bold">•</span>
+                            <span>{line.replace(/^[-•]\s*/, '')}</span>
+                          </div>
+                        );
+                      }
+                      // Handle bold text (**text**)
+                      const boldFormatted = line.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+                      return (
+                        <p key={lineIndex} className="mb-2" dangerouslySetInnerHTML={{ __html: boldFormatted }} />
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
