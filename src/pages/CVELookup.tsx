@@ -24,6 +24,17 @@ const CVELookup = () => {
       return;
     }
 
+    // Validate CVE ID format (CVE-YYYY-NNNNN)
+    const cvePattern = /^CVE-\d{4}-\d{4,}$/i;
+    if (!cvePattern.test(cveId.trim())) {
+      toast({
+        title: "Invalid Format",
+        description: "CVE ID must be in format: CVE-YYYY-NNNNN (e.g., CVE-2014-0160)",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
