@@ -61,22 +61,24 @@ const CVELookup = () => {
   const handleAiAnalysis = async (cveId: string, description: string, cvssScore?: number) => {
     setAnalyzingCve(cveId);
     
-    const prompt = `You are a cybersecurity expert. Analyze this vulnerability and provide:
+    const prompt = `You are a cybersecurity expert explaining to a non-technical user. Analyze this vulnerability:
 
 CVE ID: ${cveId}
 Description: ${description}
 ${cvssScore ? `CVSS Score: ${cvssScore}` : ''}
 
-Please provide:
-1. **Simple Explanation**: Explain what this vulnerability is in simple terms (2-3 sentences)
-2. **Potential Impact**: What could happen if this vulnerability is exploited?
-3. **Step-by-Step Fix Recommendations**:
-   - Specific actions to take
-   - Patch versions or configuration changes needed
-   - Priority level (Critical/High/Medium/Low)
-   - Testing recommendations after applying fixes
+IMPORTANT: Use plain, everyday language. Avoid technical jargon. Explain like you're talking to someone who doesn't work in IT.
 
-Be concise, practical, and specific.`;
+Please provide:
+1. **What This Means**: Explain this vulnerability in simple, everyday language (2-3 sentences). Avoid technical terms.
+2. **Why This Matters**: What could realistically happen if this isn't fixed? Use real-world examples.
+3. **How to Fix It** (in simple steps anyone can follow):
+   - What to do first
+   - What needs to be updated or changed (in plain language)
+   - How urgent this is (Critical/High/Medium/Low)
+   - How to verify it's fixed
+
+Use simple words. No technical jargon. Be clear and practical.`;
 
     try {
       const response = await chatWithGemini(prompt);
