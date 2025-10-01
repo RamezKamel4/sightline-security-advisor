@@ -26,26 +26,19 @@ export interface NVDResponse {
 }
 
 export const lookupCVE = async (cveId: string): Promise<NVDResponse> => {
-  const { data, error } = await supabase.functions.invoke('nvd-proxy', {
-    body: {},
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (error) {
-    throw new Error(`Failed to lookup CVE: ${error.message}`);
+  // Get session for authorization
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('Not authenticated');
   }
 
-  // The nvd-proxy function is called via GET with query params
-  // We need to construct the URL properly
+  // Call nvd-proxy edge function with query parameters
   const url = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?cveId=${encodeURIComponent(cveId)}`;
   
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
   });
