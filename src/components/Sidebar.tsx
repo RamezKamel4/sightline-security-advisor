@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut, Search } from 'lucide-react';
+import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut, Search, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -55,6 +55,15 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
               </li>
             );
           })}
+          <li>
+            <Link
+              to="/workflow"
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <Info className="h-5 w-5" />
+              <span className="font-medium">How It Works</span>
+            </Link>
+          </li>
           <li>
             <Link
               to="/cve-lookup"

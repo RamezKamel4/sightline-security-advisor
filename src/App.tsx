@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import CVELookup from "./pages/CVELookup";
+import WorkflowGuide from "./pages/WorkflowGuide";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,11 @@ const App = () => (
             <Route path="/cve-lookup" element={
               <ProtectedRoute>
                 <CVELookup />
+              </ProtectedRoute>
+            } />
+            <Route path="/workflow" element={
+              <ProtectedRoute>
+                <WorkflowGuide />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

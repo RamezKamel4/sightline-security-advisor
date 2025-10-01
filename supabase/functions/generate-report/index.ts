@@ -13,6 +13,20 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+interface CVEData {
+  cve_id: string;
+  title: string;
+  description: string;
+  cvss_score: number | null;
+}
+
+interface Finding {
+  port: number;
+  service_name: string;
+  service_version: string | null;
+  cve_id: string | null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -23,31 +37,13 @@ serve(async (req) => {
     
     console.log('Processing report generation for scanId:', scanId);
     
-    // Get OpenAI API key with better debugging
-    const openAIApiKey = Deno.env.get('OPENAI_KEY_New');
+    // Get Gemini API key
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     
-    console.log('Environment variables check:');
-    console.log('- OPENAI_KEY_New exists:', !!openAIApiKey);
-    if (openAIApiKey) {
-      console.log('- API key length:', openAIApiKey.length);
-      console.log('- API key starts with:', openAIApiKey.substring(0, 7) + '...');
-      console.log('- API key format check (should start with sk-):', openAIApiKey.startsWith('sk-'));
-    }
-
-    if (!openAIApiKey) {
-      console.error('OpenAI API key not found');
+    if (!geminiApiKey) {
+      console.error('Gemini API key not found');
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured in Supabase secrets. Please add OPENAI_KEY_New to your project secrets.' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (!openAIApiKey.startsWith('sk-')) {
-      console.error('Invalid OpenAI API key format');
-      return new Response(JSON.stringify({ 
-        error: 'Invalid OpenAI API key format. Key should start with "sk-"' 
+        error: 'Gemini API key not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -95,122 +91,116 @@ serve(async (req) => {
 
     console.log('Findings retrieved:', findings?.length || 0, 'findings');
 
-    // Prepare findings summary
+    // Get CVE details for all findings with CVE IDs
+    const cveIds = findings?.filter(f => f.cve_id).map(f => f.cve_id) || [];
+    let cveDetails: CVEData[] = [];
+    
+    if (cveIds.length > 0) {
+      console.log('Fetching CVE details for:', cveIds.length, 'CVEs');
+      const { data: cves, error: cveError } = await supabase
+        .from('cve')
+        .select('*')
+        .in('cve_id', cveIds);
+      
+      if (!cveError && cves) {
+        cveDetails = cves;
+        console.log('Retrieved CVE details:', cveDetails.length);
+      }
+    }
+
+    // Prepare detailed findings summary with CVE information
     const findingsSummary = findings && findings.length > 0 
-      ? findings.map(finding => 
-          `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''} ${finding.cve_id ? `(CVE: ${finding.cve_id})` : ''}`
-        ).join('\n')
+      ? findings.map(finding => {
+          const cve = cveDetails.find(c => c.cve_id === finding.cve_id);
+          let summary = `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''}`;
+          
+          if (cve) {
+            summary += `\n  CVE: ${cve.cve_id} (CVSS Score: ${cve.cvss_score || 'N/A'})`;
+            summary += `\n  Description: ${cve.description.substring(0, 200)}...`;
+          }
+          
+          return summary;
+        }).join('\n\n')
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
-    // Generate AI report
-    const prompt = `Generate a security scan report for target: ${scan.target}
+    // Generate AI report using Gemini
+    const prompt = `You are a cybersecurity expert. Generate a comprehensive security scan report for target: ${scan.target}
 
-Scan findings:
+SCAN FINDINGS:
 ${findingsSummary}
 
-Please provide:
-1. Executive Summary (2-3 sentences in plain language)
-2. Risk Assessment (overall risk level: Low/Medium/High)
-3. Detailed Findings (explain each vulnerability in simple terms)
-4. Recommended Actions (specific steps to fix issues)
+Please provide a detailed report with the following sections:
 
-Use simple, non-technical language that business stakeholders can understand. Focus on the impact and solutions rather than technical jargon.`;
+1. **Executive Summary**
+   - Brief overview in 2-3 sentences
+   - Overall security posture assessment
 
-    console.log('Making OpenAI API request...');
-    console.log('Using model: gpt-4o-mini');
-    console.log('Request payload preview:', {
-      model: 'gpt-4o-mini',
-      messages: 'Generated content',
-      max_tokens: 2000,
-      temperature: 0.3,
-    });
+2. **Risk Assessment**
+   - Overall risk level: Low/Medium/High/Critical
+   - Risk justification based on findings
 
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+3. **Detailed Vulnerability Analysis**
+   For each vulnerability found:
+   - CVE ID and CVSS score
+   - Clear explanation of what the vulnerability is
+   - Potential impact if exploited
+   - Attack scenarios
+
+4. **Recommended Remediation Actions**
+   For each vulnerability, provide:
+   - Specific step-by-step fixes
+   - Patch versions or configuration changes needed
+   - Priority level (Critical/High/Medium/Low)
+   - Implementation timeline recommendations
+
+5. **Additional Security Recommendations**
+   - General security best practices
+   - Preventive measures
+
+Use clear, professional language suitable for both technical and non-technical stakeholders.`;
+
+    console.log('Making Gemini API request...');
+
+    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
+        'X-goog-api-key': geminiApiKey,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a cybersecurity expert who explains technical findings in simple, business-friendly language.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2000,
-        temperature: 0.3,
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+        }
       }),
     });
 
-    console.log('OpenAI response status:', openAIResponse.status);
-    console.log('OpenAI response headers:', Object.fromEntries(openAIResponse.headers.entries()));
+    console.log('Gemini response status:', geminiResponse.status);
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error - Status:', openAIResponse.status);
-      console.error('OpenAI API error - Full response:', errorText);
-      
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-        console.error('Parsed OpenAI error:', errorData);
-      } catch (e) {
-        console.error('Failed to parse OpenAI error response:', e);
-      }
-      
-      // Handle specific error cases
-      if (openAIResponse.status === 401) {
-        return new Response(JSON.stringify({ 
-          error: 'Invalid OpenAI API key. Please check your API key in Supabase secrets.',
-          details: 'Authentication failed with OpenAI API'
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      if (openAIResponse.status === 429) {
-        const quotaError = errorData?.error?.code === 'insufficient_quota';
-        const rateLimitError = errorData?.error?.code === 'rate_limit_exceeded';
-        
-        if (quotaError) {
-          return new Response(JSON.stringify({ 
-            error: 'OpenAI API quota exceeded. Please add credits to your OpenAI account or upgrade your plan.',
-            details: 'Your OpenAI account has reached its usage limits'
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        if (rateLimitError) {
-          return new Response(JSON.stringify({ 
-            error: 'OpenAI API rate limit exceeded. Please try again in a few minutes.',
-            details: 'Too many requests to OpenAI API'
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-      }
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error('Gemini API error - Status:', geminiResponse.status);
+      console.error('Gemini API error - Response:', errorText);
       
       return new Response(JSON.stringify({ 
-        error: `OpenAI API error (${openAIResponse.status})`,
-        details: errorData?.error?.message || errorText,
-        raw_error: errorText
+        error: `Gemini API error (${geminiResponse.status})`,
+        details: errorText
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const aiData = await openAIResponse.json();
-    console.log('OpenAI response received successfully');
+    const aiData = await geminiResponse.json();
+    console.log('Gemini response received successfully');
     
-    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
-      console.error('Unexpected OpenAI response structure:', aiData);
+    if (!aiData.candidates || !aiData.candidates[0] || !aiData.candidates[0].content) {
+      console.error('Unexpected Gemini response structure:', aiData);
       return new Response(JSON.stringify({ 
-        error: 'Unexpected response from OpenAI API',
+        error: 'Unexpected response from Gemini API',
         details: 'Response structure was not as expected'
       }), {
         status: 500,
@@ -218,7 +208,7 @@ Use simple, non-technical language that business stakeholders can understand. Fo
       });
     }
     
-    const reportContent = aiData.choices[0].message.content;
+    const reportContent = aiData.candidates[0].content.parts[0].text;
     console.log('AI report generated successfully, length:', reportContent.length);
 
     // Store the report

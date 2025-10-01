@@ -64,6 +64,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     await storeFindings(scan.scan_id, scanResults);
 
     console.log('🎉 Scan completed successfully:', scan.scan_id);
+    console.log('ℹ️ CVE enrichment will be performed when report is generated');
     return scan.scan_id;
   } catch (error) {
     console.error('❌ Scan execution error:', error);
