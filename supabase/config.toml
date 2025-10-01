@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.gemini-chat]
 verify_jwt = true
+
+[functions.nvd-proxy]
+verify_jwt = true
