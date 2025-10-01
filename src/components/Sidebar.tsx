@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 interface SidebarProps {
   activeView: string;
@@ -54,6 +55,15 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
               </li>
             );
           })}
+          <li>
+            <Link
+              to="/cve-lookup"
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <Search className="h-5 w-5" />
+              <span className="font-medium">CVE Lookup</span>
+            </Link>
+          </li>
         </ul>
       </nav>
       
