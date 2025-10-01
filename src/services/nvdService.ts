@@ -25,15 +25,18 @@ export interface NVDResponse {
   totalResults?: number;
 }
 
-export const lookupCVE = async (cveId: string): Promise<NVDResponse> => {
+export const searchByServiceName = async (serviceName: string, version?: string): Promise<NVDResponse> => {
   // Get session for authorization
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     throw new Error('Not authenticated');
   }
 
-  // Call nvd-proxy edge function with query parameters
-  const url = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?cveId=${encodeURIComponent(cveId)}`;
+  // Build search query - combine service name and version if provided
+  const searchQuery = version ? `${serviceName} ${version}` : serviceName;
+
+  // Call nvd-proxy edge function with keyword search
+  const url = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
   
   const response = await fetch(url, {
     method: 'GET',
@@ -45,7 +48,7 @@ export const lookupCVE = async (cveId: string): Promise<NVDResponse> => {
 
   if (!response.ok) {
     const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to lookup CVE');
+    throw new Error(errorData.error || 'Failed to search vulnerabilities');
   }
 
   return response.json();

@@ -54,10 +54,11 @@ serve(async (req) => {
     const url = new URL(req.url);
     const cveId = url.searchParams.get('cveId');
     const cpeName = url.searchParams.get('cpeName');
+    const keywordSearch = url.searchParams.get('keywordSearch');
 
-    if (!cveId && !cpeName) {
+    if (!cveId && !cpeName && !keywordSearch) {
       return new Response(
-        JSON.stringify({ error: 'Either cveId or cpeName query parameter is required' }),
+        JSON.stringify({ error: 'Either cveId, cpeName, or keywordSearch query parameter is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -69,6 +70,9 @@ serve(async (req) => {
     }
     if (cpeName) {
       nvdUrl.searchParams.set('cpeName', cpeName);
+    }
+    if (keywordSearch) {
+      nvdUrl.searchParams.set('keywordSearch', keywordSearch);
     }
 
     console.log(`Proxying request to NVD API: ${nvdUrl.toString()}`);

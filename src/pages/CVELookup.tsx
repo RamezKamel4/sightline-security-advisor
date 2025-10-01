@@ -4,32 +4,22 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Search } from 'lucide-react';
-import { lookupCVE, NVDResponse } from '@/services/nvdService';
+import { searchByServiceName, NVDResponse } from '@/services/nvdService';
 import { useToast } from '@/hooks/use-toast';
 
 const CVELookup = () => {
-  const [cveId, setCveId] = useState('');
+  const [serviceName, setServiceName] = useState('');
+  const [version, setVersion] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NVDResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleLookup = async () => {
-    if (!cveId.trim()) {
+    if (!serviceName.trim()) {
       toast({
         title: "Input Required",
-        description: "Please enter a CVE ID",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate CVE ID format (CVE-YYYY-NNNNN)
-    const cvePattern = /^CVE-\d{4}-\d{4,}$/i;
-    if (!cvePattern.test(cveId.trim())) {
-      toast({
-        title: "Invalid Format",
-        description: "CVE ID must be in format: CVE-YYYY-NNNNN (e.g., CVE-2014-0160)",
+        description: "Please enter a service name",
         variant: "destructive",
       });
       return;
@@ -40,11 +30,11 @@ const CVELookup = () => {
     setResult(null);
 
     try {
-      const data = await lookupCVE(cveId);
+      const data = await searchByServiceName(serviceName, version || undefined);
       setResult(data);
       toast({
         title: "Success",
-        description: `Found ${data.totalResults || 0} result(s)`,
+        description: `Found ${data.totalResults || 0} vulnerabilities`,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
@@ -70,29 +60,36 @@ const CVELookup = () => {
       <div className="max-w-4xl mx-auto space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">CVE Lookup</CardTitle>
+            <CardTitle className="text-2xl">Vulnerability Search</CardTitle>
             <CardDescription>
-              Search the National Vulnerability Database for CVE information
+              Search for vulnerabilities by service name and version
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <Input
-                placeholder="Enter CVE ID (e.g., CVE-2014-0160)"
-                value={cveId}
-                onChange={(e) => setCveId(e.target.value)}
+                placeholder="Service name (e.g., OpenSSH, Apache, nginx)"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={loading}
               />
-              <Button onClick={handleLookup} disabled={loading}>
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-                <span className="ml-2">Lookup CVE</span>
-              </Button>
+              <Input
+                placeholder="Version (optional, e.g., 7.2, 2.4.41)"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={loading}
+              />
             </div>
+            <Button onClick={handleLookup} disabled={loading} className="w-full">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              <span className="ml-2">Search Vulnerabilities</span>
+            </Button>
 
             {error && (
               <Alert variant="destructive">
