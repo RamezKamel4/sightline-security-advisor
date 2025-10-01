@@ -44,8 +44,8 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
         ? `${finding.service_name} ${finding.service_version}`
         : finding.service_name;
 
-      // Call nvd-proxy edge function
-      const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?cpeName=${encodeURIComponent(searchQuery)}`;
+      // Call nvd-proxy edge function with keywordSearch parameter
+      const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
       
       const response = await fetch(nvdUrl, {
         method: 'GET',

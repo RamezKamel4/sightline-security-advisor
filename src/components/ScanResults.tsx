@@ -19,6 +19,12 @@ interface Finding {
   service_name: string;
   service_version: string | null;
   cve_id: string | null;
+  cve?: {
+    cve_id: string;
+    title: string;
+    description: string;
+    cvss_score: number | null;
+  };
 }
 
 interface Report {
@@ -45,7 +51,15 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
     try {
       const { data, error } = await supabase
         .from('findings')
-        .select('*')
+        .select(`
+          *,
+          cve:cve_id (
+            cve_id,
+            title,
+            description,
+            cvss_score
+          )
+        `)
         .eq('scan_id', scanId);
 
       if (error) throw error;
@@ -99,8 +113,10 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
 
   const getRiskLevel = () => {
     const criticalCVEs = findings.filter(f => f.cve_id).length;
-    if (criticalCVEs > 5) return { level: 'High', color: 'bg-red-100 text-red-800' };
-    if (criticalCVEs > 2) return { level: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
+    const highScoreCVEs = findings.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 7.0).length;
+    
+    if (highScoreCVEs > 3 || criticalCVEs > 5) return { level: 'High', color: 'bg-red-100 text-red-800' };
+    if (highScoreCVEs > 1 || criticalCVEs > 2) return { level: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
     if (criticalCVEs > 0) return { level: 'Low', color: 'bg-orange-100 text-orange-800' };
     return { level: 'Very Low', color: 'bg-green-100 text-green-800' };
   };
@@ -188,6 +204,8 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                 <TableHead>Service</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>CVE</TableHead>
+                <TableHead>CVSS Score</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -202,6 +220,29 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                       <Badge variant="destructive">{finding.cve_id}</Badge>
                     ) : (
                       <Badge variant="secondary">None</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {finding.cve?.cvss_score ? (
+                      <Badge className={
+                        finding.cve.cvss_score >= 9.0 ? 'bg-red-600 text-white' :
+                        finding.cve.cvss_score >= 7.0 ? 'bg-orange-500 text-white' :
+                        finding.cve.cvss_score >= 4.0 ? 'bg-yellow-500 text-white' :
+                        'bg-green-500 text-white'
+                      }>
+                        {finding.cve.cvss_score.toFixed(1)}
+                      </Badge>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-md">
+                    {finding.cve?.description ? (
+                      <span className="text-sm text-slate-600 line-clamp-2">
+                        {finding.cve.description}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">-</span>
                     )}
                   </TableCell>
                   <TableCell>
