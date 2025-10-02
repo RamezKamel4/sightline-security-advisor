@@ -4,6 +4,8 @@ import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut, Search, Info 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SidebarProps {
   activeView: string;
@@ -12,6 +14,23 @@ interface SidebarProps {
 
 export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const { signOut, user } = useAuth();
+  
+  // Fetch scans this month
+  const { data: scansThisMonth } = useQuery({
+    queryKey: ['scans-this-month', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      
+      const { count } = await supabase
+        .from('scans')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('start_time', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+      
+      return count || 0;
+    },
+    enabled: !!user
+  });
   
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Shield },
@@ -86,7 +105,7 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
         
         <div className="bg-slate-800 rounded-lg p-4 text-center">
           <div className="text-slate-400 text-sm mb-2">Scans this month</div>
-          <div className="text-2xl font-bold text-green-400">47</div>
+          <div className="text-2xl font-bold text-green-400">{scansThisMonth || 0}</div>
         </div>
         
         <Button 
