@@ -18,16 +18,12 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get current month start date
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-      // Get scans this month
+      // Get current month start date (using SQL date function for accuracy)
       const { count: scansThisMonth } = await supabase
         .from('scans')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .gte('start_time', firstDayOfMonth);
+        .gte('start_time', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
 
       // Get pending scans (currently running)
       const { count: pendingScans } = await supabase
