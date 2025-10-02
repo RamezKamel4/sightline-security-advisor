@@ -125,40 +125,56 @@ serve(async (req) => {
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
     // Generate AI report using Gemini
-    const prompt = `You are a cybersecurity expert. Generate a comprehensive security scan report for target: ${scan.target}
+    const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
+
+TARGET: ${scan.target}
 
 SCAN FINDINGS:
 ${findingsSummary}
 
-Please provide a detailed report with the following sections:
+Generate a client-ready security report with the following structure:
 
-1. **Executive Summary**
-   - Brief overview in 2-3 sentences
-   - Overall security posture assessment
+## 1. EXECUTIVE SUMMARY (One Page)
+- Overall risk level: Critical/High/Medium/Low
+- Top 2-3 most urgent vulnerabilities explained in plain, non-technical language
+- Clear recommendations split into:
+  * IMMEDIATE ACTIONS: Quick mitigation steps to reduce risk now
+  * PERMANENT FIXES: Long-term patches or upgrades needed
 
-2. **Risk Assessment**
-   - Overall risk level: Low/Medium/High/Critical
-   - Risk justification based on findings
+## 2. VULNERABILITY DETAILS (For Each Finding)
+For each vulnerability, provide:
+- **Port/Service/Version**: What was found
+- **CVE ID & CVSS Score**: Severity rating
+- **Business Impact Explanation**: Describe in simple terms what hackers could do (e.g., "Hackers can steal customer data" or "Systems could be taken offline")
+- **IMMEDIATE FIX**: Short-term mitigation step to reduce risk quickly
+- **PERMANENT FIX**: Proper patch, upgrade, or configuration change with version numbers
+- **Compliance Mapping**: Which standards are violated (e.g., PCI DSS Req. 6.2, ISO-27001 A.12.6.1, NIST CSF PR.IP-12)
 
-3. **Detailed Vulnerability Analysis**
-   For each vulnerability found:
-   - CVE ID and CVSS score
-   - Clear explanation of what the vulnerability is
-   - Potential impact if exploited
-   - Attack scenarios
+## 3. RISK PRIORITIZATION
+Group all findings by severity:
+- **CRITICAL**: Immediate attention required
+- **HIGH**: Address within 1 week
+- **MEDIUM**: Address within 1 month
+- **LOW**: Address when convenient
 
-4. **Recommended Remediation Actions**
-   For each vulnerability, provide:
-   - Specific step-by-step fixes
-   - Patch versions or configuration changes needed
-   - Priority level (Critical/High/Medium/Low)
-   - Implementation timeline recommendations
+Order vulnerabilities by severity within each group.
 
-5. **Additional Security Recommendations**
-   - General security best practices
-   - Preventive measures
+## 4. TECHNICAL APPENDIX
+Include raw technical details:
+- Open ports discovered
+- Service banners and versions detected
+- Nmap commands used for scanning
+- Raw tool outputs (keep this separate from executive summary)
 
-Use clear, professional language suitable for both technical and non-technical stakeholders.`;
+## STYLE REQUIREMENTS:
+- Write in professional, client-ready language
+- Executive Summary and Vulnerability Details must avoid technical jargon
+- Focus on business risk and impact, not just technical details
+- Summaries must be short, impactful, and actionable
+- Technical Appendix can include detailed technical information
+- Use bullet points and clear section headers for easy PDF conversion
+
+Generate the complete report now.`;
 
     console.log('Making Gemini API request...');
 
