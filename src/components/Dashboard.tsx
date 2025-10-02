@@ -18,13 +18,18 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get total scans
-      const { count: totalScans } = await supabase
+      // Get current month start date
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      // Get scans this month
+      const { count: scansThisMonth } = await supabase
         .from('scans')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .gte('start_time', firstDayOfMonth);
 
-      // Get pending scans
+      // Get pending scans (currently running)
       const { count: pendingScans } = await supabase
         .from('scans')
         .select('*', { count: 'exact', head: true })
@@ -39,32 +44,36 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
         .eq('status', 'completed');
 
       let criticalFindings = 0;
-      let totalFindings = 0;
+      let secureServices = 0;
 
       if (completedScans && completedScans.length > 0) {
         const scanIds = completedScans.map(scan => scan.scan_id);
         
-        // Get all findings for completed scans
+        // Get all findings for completed scans with CVE data
         const { data: findings } = await supabase
           .from('findings')
-          .select('cve_id')
+          .select(`
+            cve_id,
+            cve:cve_id (
+              cvss_score
+            )
+          `)
           .in('scan_id', scanIds);
 
         if (findings) {
-          totalFindings = findings.length;
-          // For now, count findings with CVEs as critical (we could enhance this with actual CVSS scoring)
-          criticalFindings = findings.filter(f => f.cve_id).length;
+          // Count findings with CVEs as vulnerabilities
+          const vulnerableFindings = findings.filter(f => f.cve_id);
+          criticalFindings = vulnerableFindings.length;
+          
+          // Count findings without CVEs as secure services
+          secureServices = findings.filter(f => !f.cve_id).length;
         }
       }
 
-      // For "resolved issues", we'll use a simple calculation (total findings - critical)
-      // In a real app, this would track actual resolution status
-      const resolvedIssues = Math.max(0, totalFindings - criticalFindings);
-
       return {
-        totalScans: totalScans || 0,
+        scansThisMonth: scansThisMonth || 0,
         criticalFindings,
-        resolvedIssues,
+        secureServices,
         pendingScans: pendingScans || 0
       };
     }
@@ -89,10 +98,10 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
   });
 
   const statsData = [
-    { title: 'Total Scans', value: statsLoading ? '...' : stats?.totalScans.toString() || '0', icon: Shield, color: 'text-blue-600' },
-    { title: 'Critical Findings', value: statsLoading ? '...' : stats?.criticalFindings.toString() || '0', icon: AlertTriangle, color: 'text-red-600' },
-    { title: 'Resolved Issues', value: statsLoading ? '...' : stats?.resolvedIssues.toString() || '0', icon: CheckCircle, color: 'text-green-600' },
-    { title: 'Pending Scans', value: statsLoading ? '...' : stats?.pendingScans.toString() || '0', icon: Clock, color: 'text-yellow-600' },
+    { title: 'Scans This Month', value: statsLoading ? '...' : stats?.scansThisMonth.toString() || '0', icon: Shield, color: 'text-blue-600' },
+    { title: 'Vulnerabilities Found', value: statsLoading ? '...' : stats?.criticalFindings.toString() || '0', icon: AlertTriangle, color: 'text-red-600' },
+    { title: 'Secure Services', value: statsLoading ? '...' : stats?.secureServices.toString() || '0', icon: CheckCircle, color: 'text-green-600' },
+    { title: 'Active Scans', value: statsLoading ? '...' : stats?.pendingScans.toString() || '0', icon: Clock, color: 'text-yellow-600' },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -192,36 +201,39 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-600">Critical</span>
+                <span className="text-sm font-medium text-slate-600">Vulnerabilities</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-32 h-2 bg-slate-200 rounded-full">
                     <div 
                       className="h-2 bg-red-500 rounded-full" 
-                      style={{ width: stats?.criticalFindings ? `${Math.min((stats.criticalFindings / Math.max(stats.criticalFindings + stats.resolvedIssues, 1)) * 100, 100)}%` : '0%' }}
+                      style={{ width: stats?.criticalFindings ? `${Math.min((stats.criticalFindings / Math.max(stats.criticalFindings + stats.secureServices, 1)) * 100, 100)}%` : '0%' }}
                     ></div>
                   </div>
                   <span className="text-sm font-medium">{stats?.criticalFindings || 0}</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-600">Medium</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 h-2 bg-slate-200 rounded-full">
-                    <div className="w-1/2 h-2 bg-yellow-500 rounded-full"></div>
-                  </div>
-                  <span className="text-sm font-medium">0</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-600">Low</span>
+                <span className="text-sm font-medium text-slate-600">Secure Services</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-32 h-2 bg-slate-200 rounded-full">
                     <div 
                       className="h-2 bg-green-500 rounded-full" 
-                      style={{ width: stats?.resolvedIssues ? `${Math.min((stats.resolvedIssues / Math.max(stats.criticalFindings + stats.resolvedIssues, 1)) * 100, 100)}%` : '0%' }}
+                      style={{ width: stats?.secureServices ? `${Math.min((stats.secureServices / Math.max(stats.criticalFindings + stats.secureServices, 1)) * 100, 100)}%` : '0%' }}
                     ></div>
                   </div>
-                  <span className="text-sm font-medium">{stats?.resolvedIssues || 0}</span>
+                  <span className="text-sm font-medium">{stats?.secureServices || 0}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-600">Active Scans</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-32 h-2 bg-slate-200 rounded-full">
+                    <div 
+                      className="h-2 bg-blue-500 rounded-full" 
+                      style={{ width: stats?.pendingScans ? `${Math.min((stats.pendingScans / Math.max(stats.scansThisMonth || 1, 1)) * 100, 100)}%` : '0%' }}
+                    ></div>
+                  </div>
+                  <span className="text-sm font-medium">{stats?.pendingScans || 0}</span>
                 </div>
               </div>
             </div>
