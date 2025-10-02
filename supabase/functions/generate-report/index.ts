@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { jsPDF } from 'https://esm.sh/jspdf@2.5.1';
+import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -212,63 +212,128 @@ Use clear, professional language suitable for both technical and non-technical s
     const reportContent = aiData.candidates[0].content.parts[0].text;
     console.log('AI report generated successfully, length:', reportContent.length);
 
-    // Generate PDF from report content
+    // Generate PDF
     console.log('Generating PDF...');
-    const pdf = new jsPDF({
-      format: 'a4',
-      unit: 'mm',
-    });
-
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    const fontSize = 11;
+    const margin = 50;
+    const lineHeight = fontSize * 1.5;
+    let currentPage = pdfDoc.addPage();
+    let { width, height } = currentPage.getSize();
+    let yPosition = height - margin;
+    
     // Add title
-    pdf.setFontSize(20);
-    pdf.text('Security Scan Report', 20, 20);
+    currentPage.drawText('Security Scan Report', {
+      x: margin,
+      y: yPosition,
+      size: 20,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= 40;
     
-    pdf.setFontSize(12);
-    pdf.text(`Target: ${scan.target}`, 20, 35);
-    pdf.text(`Date: ${new Date().toLocaleString()}`, 20, 42);
+    // Add scan details
+    currentPage.drawText(`Target: ${scan.target}`, {
+      x: margin,
+      y: yPosition,
+      size: fontSize,
+      font: font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+    yPosition -= lineHeight * 2;
     
-    // Add report content
-    pdf.setFontSize(10);
-    const splitText = pdf.splitTextToSize(reportContent, 170);
-    pdf.text(splitText, 20, 55);
-
-    // Convert PDF to base64
-    const pdfBase64 = pdf.output('datauristring').split(',')[1];
-    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    // Split report content into lines and add to PDF
+    const lines = reportContent.split('\n');
+    for (const line of lines) {
+      // Check if we need a new page
+      if (yPosition < margin + lineHeight) {
+        currentPage = pdfDoc.addPage();
+        yPosition = height - margin;
+      }
+      
+      // Determine if line is a header (starts with # or **)
+      const isHeader = line.trim().startsWith('#') || line.trim().startsWith('**');
+      const cleanLine = line.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+      
+      // Word wrap long lines
+      const maxWidth = width - (2 * margin);
+      const words = cleanLine.split(' ');
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const textWidth = (isHeader ? boldFont : font).widthOfTextAtSize(testLine, fontSize);
+        
+        if (textWidth > maxWidth && currentLine) {
+          // Draw current line
+          currentPage.drawText(currentLine, {
+            x: margin,
+            y: yPosition,
+            size: fontSize,
+            font: isHeader ? boldFont : font,
+            color: rgb(0, 0, 0),
+          });
+          yPosition -= lineHeight;
+          currentLine = word;
+          
+          // Check for new page
+          if (yPosition < margin + lineHeight) {
+            currentPage = pdfDoc.addPage();
+            yPosition = height - margin;
+          }
+        } else {
+          currentLine = testLine;
+        }
+      }
+      
+      // Draw remaining text
+      if (currentLine) {
+        currentPage.drawText(currentLine, {
+          x: margin,
+          y: yPosition,
+          size: fontSize,
+          font: isHeader ? boldFont : font,
+          color: rgb(0, 0, 0),
+        });
+        yPosition -= lineHeight;
+      }
+      
+      // Add extra spacing after headers
+      if (isHeader) {
+        yPosition -= lineHeight * 0.5;
+      }
+    }
     
-    console.log('PDF generated successfully, size:', pdfBuffer.length);
-
+    const pdfBytes = await pdfDoc.save();
+    console.log('PDF generated, size:', pdfBytes.length, 'bytes');
+    
     // Upload PDF to storage
     console.log('Uploading PDF to storage...');
-    const fileName = `${scanId}/report_${Date.now()}.pdf`;
+    const fileName = `${scanId}/report-${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage
       .from('reports')
-      .upload(fileName, pdfBuffer, {
+      .upload(fileName, pdfBytes, {
         contentType: 'application/pdf',
         upsert: true
       });
-
+    
     if (uploadError) {
       console.error('PDF upload error:', uploadError);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to upload PDF',
-        details: uploadError.message 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Continue anyway - we'll save the report without the PDF
     }
-
-    console.log('PDF uploaded successfully');
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    
+    // Get public URL for the PDF
+    const { data: urlData } = supabase.storage
       .from('reports')
       .getPublicUrl(fileName);
+    
+    const pdfUrl = uploadError ? null : urlData.publicUrl;
+    console.log('PDF URL:', pdfUrl);
 
-    console.log('PDF public URL:', publicUrl);
-
-    // Store the report with PDF URL
+    // Store the report
     console.log('Storing report in database...');
     const { error: reportError } = await supabase
       .from('reports')
@@ -276,7 +341,7 @@ Use clear, professional language suitable for both technical and non-technical s
         scan_id: scanId,
         summary: reportContent,
         fix_recommendations: extractRecommendations(reportContent),
-        pdf_url: publicUrl,
+        pdf_url: pdfUrl,
         created_at: new Date().toISOString()
       }, {
         onConflict: 'scan_id'
@@ -298,6 +363,7 @@ Use clear, professional language suitable for both technical and non-technical s
     return new Response(JSON.stringify({ 
       success: true, 
       report: reportContent,
+      pdfUrl: pdfUrl,
       message: 'Report generated successfully' 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
