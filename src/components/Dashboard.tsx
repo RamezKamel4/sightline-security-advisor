@@ -18,6 +18,12 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Get total scans (all-time)
+      const { count: totalScans } = await supabase
+        .from('scans')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
       // Get current month start date (using SQL date function for accuracy)
       const { count: scansThisMonth } = await supabase
         .from('scans')
@@ -67,6 +73,7 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
       }
 
       return {
+        totalScans: totalScans || 0,
         scansThisMonth: scansThisMonth || 0,
         criticalFindings,
         secureServices,
@@ -94,10 +101,10 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
   });
 
   const statsData = [
-    { title: 'Scans This Month', value: statsLoading ? '...' : stats?.scansThisMonth.toString() || '0', icon: Shield, color: 'text-blue-600' },
+    { title: 'Total Scans', value: statsLoading ? '...' : stats?.totalScans.toString() || '0', icon: Shield, color: 'text-blue-600' },
+    { title: 'Scans This Month', value: statsLoading ? '...' : stats?.scansThisMonth.toString() || '0', icon: Clock, color: 'text-purple-600' },
     { title: 'Vulnerabilities Found', value: statsLoading ? '...' : stats?.criticalFindings.toString() || '0', icon: AlertTriangle, color: 'text-red-600' },
     { title: 'Secure Services', value: statsLoading ? '...' : stats?.secureServices.toString() || '0', icon: CheckCircle, color: 'text-green-600' },
-    { title: 'Active Scans', value: statsLoading ? '...' : stats?.pendingScans.toString() || '0', icon: Clock, color: 'text-yellow-600' },
   ];
 
   const getStatusBadge = (status: string) => {
