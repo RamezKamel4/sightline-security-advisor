@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { jsPDF } from 'https://esm.sh/jspdf@2.5.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -211,7 +212,63 @@ Use clear, professional language suitable for both technical and non-technical s
     const reportContent = aiData.candidates[0].content.parts[0].text;
     console.log('AI report generated successfully, length:', reportContent.length);
 
-    // Store the report
+    // Generate PDF from report content
+    console.log('Generating PDF...');
+    const pdf = new jsPDF({
+      format: 'a4',
+      unit: 'mm',
+    });
+
+    // Add title
+    pdf.setFontSize(20);
+    pdf.text('Security Scan Report', 20, 20);
+    
+    pdf.setFontSize(12);
+    pdf.text(`Target: ${scan.target}`, 20, 35);
+    pdf.text(`Date: ${new Date().toLocaleString()}`, 20, 42);
+    
+    // Add report content
+    pdf.setFontSize(10);
+    const splitText = pdf.splitTextToSize(reportContent, 170);
+    pdf.text(splitText, 20, 55);
+
+    // Convert PDF to base64
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    
+    console.log('PDF generated successfully, size:', pdfBuffer.length);
+
+    // Upload PDF to storage
+    console.log('Uploading PDF to storage...');
+    const fileName = `${scanId}/report_${Date.now()}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from('reports')
+      .upload(fileName, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('PDF upload error:', uploadError);
+      return new Response(JSON.stringify({ 
+        error: 'Failed to upload PDF',
+        details: uploadError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('PDF uploaded successfully');
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('reports')
+      .getPublicUrl(fileName);
+
+    console.log('PDF public URL:', publicUrl);
+
+    // Store the report with PDF URL
     console.log('Storing report in database...');
     const { error: reportError } = await supabase
       .from('reports')
@@ -219,6 +276,7 @@ Use clear, professional language suitable for both technical and non-technical s
         scan_id: scanId,
         summary: reportContent,
         fix_recommendations: extractRecommendations(reportContent),
+        pdf_url: publicUrl,
         created_at: new Date().toISOString()
       }, {
         onConflict: 'scan_id'
