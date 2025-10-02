@@ -111,6 +111,34 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!report?.pdf_url) return;
+
+    try {
+      const response = await fetch(report.pdf_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `security-report-${scanId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Report has been downloaded to your device.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the PDF report",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getRiskLevel = () => {
     const criticalCVEs = findings.filter(f => f.cve_id).length;
     const highScoreCVEs = findings.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 7.0).length;
@@ -145,8 +173,8 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               {isGeneratingReport ? 'Generating...' : 'Generate AI Report'}
             </Button>
           )}
-          {report && (
-            <Button variant="outline">
+          {report && report.pdf_url && (
+            <Button variant="outline" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
