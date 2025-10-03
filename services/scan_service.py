@@ -78,9 +78,6 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
         args_set.add('-sT')
         print(f"⚠ Using TCP connect scan (-sT), no raw socket capability")
     
-    # Add -Pn for host discovery (skip ping)
-    args_set.add('-Pn')
-    
     # Rebuild args in preferred order: timing, ports, scan type, version, discovery
     final_args = []
     
@@ -106,11 +103,6 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
     if '-sV' in args_set:
         final_args.append('-sV')
         args_set.discard('-sV')
-    
-    # Host discovery
-    if '-Pn' in args_set:
-        final_args.append('-Pn')
-        args_set.discard('-Pn')
     
     # Add any remaining args (sorted for consistency)
     final_args.extend(sorted(args_set))
