@@ -11,16 +11,17 @@ async def scan_ip(request: ScanRequest):
     """
     Perform network scan on target IP address
     Supports follow-up scans when request.follow_up=True
+    Returns: { results: [...], nmap_cmd: "...", nmap_output: "..." }
     """
     try:
         print(f"🔍 Received scan request: {request}")
-        result = perform_network_scan(
+        scan_data = perform_network_scan(
             ip_address=request.ip_address,
             nmap_args=request.nmap_args,
             scan_profile=request.scan_profile,
             follow_up=getattr(request, "follow_up", False)
         )
-        return result
+        return scan_data
 
     except Exception as e:
         print(f"❌ Scan error: {e}")

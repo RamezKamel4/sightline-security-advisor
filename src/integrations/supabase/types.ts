@@ -115,32 +115,44 @@ export type Database = {
       scans: {
         Row: {
           end_time: string | null
+          nmap_cmd: string | null
+          nmap_output: string | null
           profile: string | null
           scan_depth: string | null
           scan_id: string
+          scan_source: string | null
           start_time: string | null
           status: string | null
           target: string
+          use_arp_discovery: boolean | null
           user_id: string
         }
         Insert: {
           end_time?: string | null
+          nmap_cmd?: string | null
+          nmap_output?: string | null
           profile?: string | null
           scan_depth?: string | null
           scan_id?: string
+          scan_source?: string | null
           start_time?: string | null
           status?: string | null
           target: string
+          use_arp_discovery?: boolean | null
           user_id: string
         }
         Update: {
           end_time?: string | null
+          nmap_cmd?: string | null
+          nmap_output?: string | null
           profile?: string | null
           scan_depth?: string | null
           scan_id?: string
+          scan_source?: string | null
           start_time?: string | null
           status?: string | null
           target?: string
+          use_arp_discovery?: boolean | null
           user_id?: string
         }
         Relationships: []

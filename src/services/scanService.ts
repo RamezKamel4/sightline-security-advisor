@@ -47,25 +47,27 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // Start the actual scan
   try {
-    const scanResults = await executeScan(
+    const scanResponse = await executeScan(
       scanData.target, 
       scanData.scanDepth as 'fast' | 'deep' | 'aggressive', 
       scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
     );
     
-    // Update scan status to completed
+    // Update scan status to completed and store nmap command
     console.log('💾 Updating scan status to completed...');
     await supabase
       .from('scans')
       .update({
         status: 'completed',
-        end_time: new Date().toISOString()
+        end_time: new Date().toISOString(),
+        nmap_cmd: scanResponse.nmapCmd,
+        nmap_output: scanResponse.nmapOutput
       })
       .eq('scan_id', scan.scan_id);
 
     // Store findings
-    console.log('💾 Storing', scanResults.length, 'findings...');
-    await storeFindings(scan.scan_id, scanResults);
+    console.log('💾 Storing', scanResponse.results.length, 'findings...');
+    await storeFindings(scan.scan_id, scanResponse.results);
 
     console.log('🎉 Scan completed successfully:', scan.scan_id);
     console.log('ℹ️ CVE enrichment will be performed when report is generated');

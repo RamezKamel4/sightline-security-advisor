@@ -30,7 +30,18 @@ export interface ScanResult {
   cves?: any[];
 }
 
-export const executeScan = async (target: string, scanDepth: DepthKey, scanProfile: ProfileKey): Promise<ScanResult[]> => {
+export interface ScanResponse {
+  results: ScanResult[];
+  nmap_cmd: string;
+  nmap_output: string;
+  error?: string;
+}
+
+export const executeScan = async (
+  target: string, 
+  scanDepth: DepthKey, 
+  scanProfile: ProfileKey
+): Promise<{ results: ScanResult[], nmapCmd: string, nmapOutput: string }> => {
   const depthArgs = scanDepthMapping[scanDepth] ?? scanDepthMapping['fast'];
   const profileArgs = scanProfilePorts[scanProfile] ?? scanProfilePorts['comprehensive'];
   const nmapArgs = `${depthArgs} ${profileArgs}`;
@@ -54,11 +65,12 @@ export const executeScan = async (target: string, scanDepth: DepthKey, scanProfi
     throw new Error(`Scan failed: ${response.status} - ${errorText}`);
   }
 
-  const scanResults: ScanResult[] = await response.json();
-  console.log('Scan results:', scanResults);
+  const scanData: ScanResponse = await response.json();
+  console.log('Scan command used:', scanData.nmap_cmd);
+  console.log('Scan results:', scanData.results);
 
   // Check for services with unknown versions and run follow-up scans
-  const unknownServices = scanResults.filter(s => !s.version || s.version.toLowerCase() === 'unknown');
+  const unknownServices = scanData.results.filter(s => !s.version || s.version.toLowerCase() === 'unknown');
   
   if (unknownServices.length > 0) {
     console.log(`Found ${unknownServices.length} services with unknown version, running follow-up scans...`);
@@ -79,20 +91,20 @@ export const executeScan = async (target: string, scanDepth: DepthKey, scanProfi
         });
 
         if (followupResponse.ok) {
-          const followupResults: ScanResult[] = await followupResponse.json();
+          const followupData: ScanResponse = await followupResponse.json();
           
           // Update the original result with new version info
-          const originalIndex = scanResults.findIndex(
+          const originalIndex = scanData.results.findIndex(
             r => r.host === service.host && r.port === service.port
           );
           
-          if (originalIndex >= 0 && followupResults.length > 0) {
-            const updatedService = followupResults[0];
+          if (originalIndex >= 0 && followupData.results.length > 0) {
+            const updatedService = followupData.results[0];
             if (updatedService.version && updatedService.version !== 'unknown') {
-              scanResults[originalIndex].version = updatedService.version;
+              scanData.results[originalIndex].version = updatedService.version;
             }
             if (updatedService.cves && updatedService.cves.length > 0) {
-              scanResults[originalIndex].cves = updatedService.cves;
+              scanData.results[originalIndex].cves = updatedService.cves;
             }
           }
         }
@@ -102,5 +114,9 @@ export const executeScan = async (target: string, scanDepth: DepthKey, scanProfi
     }
   }
 
-  return scanResults;
+  return {
+    results: scanData.results,
+    nmapCmd: scanData.nmap_cmd,
+    nmapOutput: scanData.nmap_output
+  };
 };

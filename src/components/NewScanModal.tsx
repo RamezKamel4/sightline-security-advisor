@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { createScan } from '@/services/scanService';
+import { ScanPermissionModal } from './ScanPermissionModal';
 
 interface NewScanModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
   const [password, setPassword] = useState('');
   const [schedule, setSchedule] = useState('now');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [pendingScanData, setPendingScanData] = useState<any>(null);
   const { toast } = useToast();
 
   const handleStartScan = async () => {
@@ -36,17 +39,26 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
       return;
     }
 
+    const scanData = {
+      target,
+      scanProfile,
+      scanDepth,
+      username: username || undefined,
+      password: password || undefined,
+      schedule,
+    };
+
+    // Show permission modal before starting
+    setPendingScanData(scanData);
+    setShowPermissionModal(true);
+  };
+
+  const handleConfirmScan = async () => {
+    setShowPermissionModal(false);
     setIsLoading(true);
     
     try {
-      const scanId = await createScan({
-        target,
-        scanProfile,
-        scanDepth,
-        username: username || undefined,
-        password: password || undefined,
-        schedule,
-      });
+      const scanId = await createScan(pendingScanData);
 
       toast({
         title: "Scan Started",
@@ -60,6 +72,7 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
       setUsername('');
       setPassword('');
       setSchedule('now');
+      setPendingScanData(null);
       
       onScanCreated?.();
       onClose();
@@ -73,6 +86,11 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCancelPermission = () => {
+    setShowPermissionModal(false);
+    setPendingScanData(null);
   };
 
   return (
@@ -227,6 +245,13 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
           </Button>
         </div>
       </DialogContent>
+      
+      <ScanPermissionModal
+        isOpen={showPermissionModal}
+        onConfirm={handleConfirmScan}
+        onCancel={handleCancelPermission}
+        scanType={`${scanDepth} ${scanProfile}`}
+      />
     </Dialog>
   );
 };
