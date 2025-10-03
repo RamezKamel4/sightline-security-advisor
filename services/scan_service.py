@@ -60,19 +60,22 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
     is_private = is_private_cidr(target)
     has_raw = backend_has_raw_socket()
     
+    # Remove flags we'll explicitly control
+    args_set.discard('-Pn')  # Don't use for LAN scans
+    args_set.discard('-sT')
+    args_set.discard('-sS')
+    args_set.discard('-sV')
+    
     # Always add service detection
     args_set.add('-sV')
     
     # Use SYN scan if we have raw socket capability, otherwise TCP connect
     if has_raw:
-        args_set.discard('-sT')  # Remove TCP connect if present
         args_set.add('-sS')
+        print(f"✓ Using SYN scan (-sS) with raw socket capability")
     else:
-        args_set.discard('-sS')  # Remove SYN if present
         args_set.add('-sT')
-    
-    # For LAN scans, don't add -Pn (let nmap use default host discovery)
-    # For non-LAN, could add -Pn but user wants clean command
+        print(f"⚠ Using TCP connect scan (-sT), no raw socket capability")
     
     # Rebuild args in preferred order: timing, ports, scan type, version
     final_args = []
@@ -100,7 +103,7 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
         final_args.append('-sV')
         args_set.discard('-sV')
     
-    # Add any remaining args
+    # Add any remaining args (sorted for consistency)
     final_args.extend(sorted(args_set))
     
     print(f"✓ Built nmap command for {target}: {' '.join(final_args)}")
