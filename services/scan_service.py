@@ -53,15 +53,16 @@ def backend_on_subnet(target: str) -> bool:
 
 def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) -> str:
     """Build nmap args optimized for LAN scanning when applicable"""
-    # Start with base args and deduplicate
+    # Start with base args and deduplicate (handles duplicate -F from frontend)
     args_set = set(base_args.split())
     
     # Check if we should use LAN-specific optimizations
     is_private = is_private_cidr(target)
     has_raw = backend_has_raw_socket()
+    on_subnet = backend_on_subnet(target)
     
     # Remove flags we'll explicitly control
-    args_set.discard('-Pn')  # Don't use for LAN scans
+    args_set.discard('-Pn')
     args_set.discard('-sT')
     args_set.discard('-sS')
     args_set.discard('-sV')
@@ -77,7 +78,10 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
         args_set.add('-sT')
         print(f"⚠ Using TCP connect scan (-sT), no raw socket capability")
     
-    # Rebuild args in preferred order: timing, ports, scan type, version
+    # Add -Pn for host discovery (skip ping)
+    args_set.add('-Pn')
+    
+    # Rebuild args in preferred order: timing, ports, scan type, version, discovery
     final_args = []
     
     # Timing
@@ -85,7 +89,7 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
         final_args.append('-T4')
         args_set.discard('-T4')
     
-    # Port specification
+    # Port specification (deduplicated by set)
     if '-F' in args_set:
         final_args.append('-F')
         args_set.discard('-F')
@@ -102,6 +106,11 @@ def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) ->
     if '-sV' in args_set:
         final_args.append('-sV')
         args_set.discard('-sV')
+    
+    # Host discovery
+    if '-Pn' in args_set:
+        final_args.append('-Pn')
+        args_set.discard('-Pn')
     
     # Add any remaining args (sorted for consistency)
     final_args.extend(sorted(args_set))
