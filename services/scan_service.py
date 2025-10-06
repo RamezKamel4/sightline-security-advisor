@@ -52,63 +52,13 @@ def backend_on_subnet(target: str) -> bool:
         return False
 
 def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) -> str:
-    """Build nmap args optimized for LAN scanning when applicable"""
-    # Start with base args and deduplicate (handles duplicate -F from frontend)
+    """Build nmap args - simplified for trial"""
+    # Deduplicate args from frontend
     args_set = set(base_args.split())
+    final_args = ' '.join(sorted(args_set))
     
-    # Check if we should use LAN-specific optimizations
-    is_private = is_private_cidr(target)
-    has_raw = backend_has_raw_socket()
-    on_subnet = backend_on_subnet(target)
-    
-    # Remove flags we'll explicitly control
-    args_set.discard('-Pn')
-    args_set.discard('-sT')
-    args_set.discard('-sS')
-    args_set.discard('-sV')
-    
-    # Always add service detection
-    args_set.add('-sV')
-    
-    # Use SYN scan if we have raw socket capability, otherwise TCP connect
-    if has_raw:
-        args_set.add('-sS')
-        print(f"✓ Using SYN scan (-sS) with raw socket capability")
-    else:
-        args_set.add('-sT')
-        print(f"⚠ Using TCP connect scan (-sT), no raw socket capability")
-    
-    # Rebuild args in preferred order: timing, ports, scan type, version, discovery
-    final_args = []
-    
-    # Timing
-    if '-T4' in args_set:
-        final_args.append('-T4')
-        args_set.discard('-T4')
-    
-    # Port specification (deduplicated by set)
-    if '-F' in args_set:
-        final_args.append('-F')
-        args_set.discard('-F')
-    
-    # Scan type
-    if '-sS' in args_set:
-        final_args.append('-sS')
-        args_set.discard('-sS')
-    elif '-sT' in args_set:
-        final_args.append('-sT')
-        args_set.discard('-sT')
-    
-    # Version detection
-    if '-sV' in args_set:
-        final_args.append('-sV')
-        args_set.discard('-sV')
-    
-    # Add any remaining args (sorted for consistency)
-    final_args.extend(sorted(args_set))
-    
-    print(f"✓ Built nmap command for {target}: {' '.join(final_args)}")
-    return ' '.join(final_args)
+    print(f"✓ Built nmap command for {target}: {final_args}")
+    return final_args
 
 def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, follow_up: bool = False) -> Dict[str, Any]:
     """
