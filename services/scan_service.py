@@ -68,13 +68,14 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         follow_up: Whether this is a follow-up scan for version detection
         
     Returns:
-        Dictionary containing scan results with CVE information and command used
+        Dictionary containing scan results with CVE information, OS detection, and command used
     """
     print(f"🔍 Starting {'follow-up ' if follow_up else ''}scan on {ip_address} with args: {nmap_args}")
     
     try:
         nm = nmap.PortScanner()
         results = []
+        host_info = {}
         
         # Apply LAN-aware optimizations
         if not follow_up:
@@ -105,6 +106,54 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         
         host = hosts_list[0]
         host_data = nm[host]
+        
+        # Extract host metadata (OS detection, MAC, latency, etc.)
+        if not follow_up:
+            print(f"🖥️  Extracting host information...")
+            
+            # OS Detection
+            os_matches = host_data.get('osmatch', [])
+            if os_matches:
+                host_info['os_matches'] = [
+                    {
+                        'name': match.get('name', 'Unknown'),
+                        'accuracy': match.get('accuracy', 0),
+                        'os_class': match.get('osclass', [])
+                    }
+                    for match in os_matches[:3]  # Top 3 matches
+                ]
+                print(f"🎯 OS Detection: {os_matches[0].get('name')} ({os_matches[0].get('accuracy')}% accuracy)")
+            
+            # MAC Address
+            addresses = host_data.get('addresses', {})
+            if 'mac' in addresses:
+                host_info['mac_address'] = addresses['mac']
+                vendor = host_data.get('vendor', {}).get(addresses['mac'], 'Unknown')
+                host_info['mac_vendor'] = vendor
+                print(f"📡 MAC Address: {addresses['mac']} ({vendor})")
+            
+            # Host state and latency
+            if 'status' in host_data:
+                host_info['state'] = host_data['status'].get('state', 'unknown')
+                host_info['reason'] = host_data['status'].get('reason', 'unknown')
+            
+            # Uptime (if available)
+            if 'uptime' in host_data:
+                host_info['uptime'] = {
+                    'seconds': host_data['uptime'].get('seconds', 0),
+                    'lastboot': host_data['uptime'].get('lastboot', '')
+                }
+            
+            # Distance (network hops)
+            if 'distance' in host_data:
+                host_info['distance'] = host_data['distance']
+                print(f"🌐 Network distance: {host_data['distance']} hops")
+            
+            # Hostname
+            hostnames = host_data.get('hostnames', [])
+            if hostnames:
+                host_info['hostnames'] = [h.get('name', '') for h in hostnames if h.get('name')]
+                print(f"🏷️  Hostname: {', '.join(host_info['hostnames'])}")
 
         if 'tcp' not in host_data or not host_data['tcp']:
             return {
@@ -153,11 +202,12 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         print(f"✅ Scan completed successfully")
         print(f"📊 Found {len(results)} services")
         
-        # Return both results and metadata
+        # Return results, metadata, and host information
         return {
             "results": results,
             "nmap_cmd": full_command,
-            "nmap_output": nm.csv() if hasattr(nm, 'csv') else str(nm.all_hosts())
+            "nmap_output": nm.csv() if hasattr(nm, 'csv') else str(nm.all_hosts()),
+            "host_info": host_info if host_info else None
         }
 
     except nmap.PortScannerError as e:
@@ -166,7 +216,8 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
             "results": [],
             "nmap_cmd": f"nmap {nmap_args} {ip_address}",
             "nmap_output": f"Error: {str(e)}",
-            "error": str(e)
+            "error": str(e),
+            "host_info": None
         }
     except Exception as e:
         print(f"❌ Unexpected error during scan: {e}")
@@ -175,5 +226,6 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
             "results": [],
             "nmap_cmd": f"nmap {nmap_args} {ip_address}",
             "nmap_output": f"Error: {str(e)}",
-            "error": str(e)
+            "error": str(e),
+            "host_info": None
         }

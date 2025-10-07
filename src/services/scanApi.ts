@@ -21,6 +21,26 @@ const profileExtraScripts: Record<ProfileKey, string> = {
   'comprehensive': 'default,safe'
 };
 
+export interface OSMatch {
+  name: string;
+  accuracy: number;
+  os_class?: any[];
+}
+
+export interface HostInfo {
+  os_matches?: OSMatch[];
+  mac_address?: string;
+  mac_vendor?: string;
+  state?: string;
+  reason?: string;
+  uptime?: {
+    seconds: number;
+    lastboot: string;
+  };
+  distance?: number;
+  hostnames?: string[];
+}
+
 export interface ScanResult {
   host: string;
   port: number;
@@ -34,6 +54,7 @@ export interface ScanResponse {
   results: ScanResult[];
   nmap_cmd: string;
   nmap_output: string;
+  host_info?: HostInfo | null;
   error?: string;
 }
 
@@ -41,7 +62,7 @@ export const executeScan = async (
   target: string, 
   scanDepth: DepthKey, 
   scanProfile: ProfileKey
-): Promise<{ results: ScanResult[], nmapCmd: string, nmapOutput: string }> => {
+): Promise<{ results: ScanResult[], nmapCmd: string, nmapOutput: string, hostInfo?: HostInfo | null }> => {
   const depthArgs = scanDepthMapping[scanDepth] ?? scanDepthMapping['fast'];
   const profileArgs = scanProfilePorts[scanProfile] ?? scanProfilePorts['comprehensive'];
   const nmapArgs = `${depthArgs} ${profileArgs}`;
@@ -117,6 +138,7 @@ export const executeScan = async (
   return {
     results: scanData.results,
     nmapCmd: scanData.nmap_cmd,
-    nmapOutput: scanData.nmap_output
+    nmapOutput: scanData.nmap_output,
+    hostInfo: scanData.host_info
   };
 };

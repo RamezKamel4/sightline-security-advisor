@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Download, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FileText, Download, AlertTriangle, CheckCircle, Monitor, Wifi, HardDrive } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { generateReport } from '@/services/scanService';
+import type { HostInfo } from '@/services/scanApi';
 
 interface ScanResultsProps {
   scanId: string;
@@ -38,6 +39,7 @@ interface Report {
 export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [report, setReport] = useState<Report | null>(null);
+  const [hostInfo, setHostInfo] = useState<HostInfo | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -45,6 +47,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   useEffect(() => {
     fetchFindings();
     fetchReport();
+    fetchHostInfo();
   }, [scanId]);
 
   const fetchFindings = async () => {
@@ -88,6 +91,21 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
       setReport(data);
     } catch (error) {
       console.error('Error fetching report:', error);
+    }
+  };
+
+  const fetchHostInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scans')
+        .select('host_info')
+        .eq('scan_id', scanId)
+        .single();
+
+      if (error) throw error;
+      setHostInfo(data?.host_info || null);
+    } catch (error) {
+      console.error('Error fetching host info:', error);
     }
   };
 
@@ -219,6 +237,77 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {hostInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="h-5 w-5" />
+              Host Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {hostInfo.os_matches && hostInfo.os_matches.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm text-slate-600 mb-2 flex items-center gap-2">
+                    <HardDrive className="h-4 w-4" />
+                    Operating System Detection
+                  </h4>
+                  <div className="space-y-2">
+                    {hostInfo.os_matches.map((os, idx) => (
+                      <div key={idx} className="flex justify-between items-center">
+                        <span className="text-sm">{os.name}</span>
+                        <Badge variant="secondary">{os.accuracy}% match</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(hostInfo.mac_address || hostInfo.hostnames) && (
+                <div>
+                  <h4 className="font-semibold text-sm text-slate-600 mb-2 flex items-center gap-2">
+                    <Wifi className="h-4 w-4" />
+                    Network Information
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {hostInfo.mac_address && (
+                      <div>
+                        <span className="text-slate-600">MAC Address:</span>
+                        <p className="font-mono">{hostInfo.mac_address}</p>
+                        {hostInfo.mac_vendor && (
+                          <p className="text-slate-500 text-xs">Vendor: {hostInfo.mac_vendor}</p>
+                        )}
+                      </div>
+                    )}
+                    {hostInfo.hostnames && hostInfo.hostnames.length > 0 && (
+                      <div>
+                        <span className="text-slate-600">Hostname(s):</span>
+                        <p>{hostInfo.hostnames.join(', ')}</p>
+                      </div>
+                    )}
+                    {hostInfo.distance !== undefined && (
+                      <div>
+                        <span className="text-slate-600">Network Distance:</span>
+                        <p>{hostInfo.distance} hops</p>
+                      </div>
+                    )}
+                    {hostInfo.state && (
+                      <div>
+                        <span className="text-slate-600">Host State:</span>
+                        <Badge variant={hostInfo.state === 'up' ? 'default' : 'secondary'}>
+                          {hostInfo.state}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

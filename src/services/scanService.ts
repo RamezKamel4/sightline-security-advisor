@@ -33,7 +33,8 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       scan_depth: scanData.scanDepth,
       status: 'running',
       start_time: new Date().toISOString(),
-      user_id: user.id
+      user_id: user.id,
+      host_info: null  // Will be populated after scan completes
     })
     .select()
     .single();
@@ -53,7 +54,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
     );
     
-    // Update scan status to completed and store nmap command
+    // Update scan status to completed and store nmap command + host info
     console.log('💾 Updating scan status to completed...');
     await supabase
       .from('scans')
@@ -61,7 +62,8 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         status: 'completed',
         end_time: new Date().toISOString(),
         nmap_cmd: scanResponse.nmapCmd,
-        nmap_output: scanResponse.nmapOutput
+        nmap_output: scanResponse.nmapOutput,
+        host_info: scanResponse.hostInfo || null
       })
       .eq('scan_id', scan.scan_id);
 
