@@ -52,13 +52,10 @@ def backend_on_subnet(target: str) -> bool:
         return False
 
 def build_lan_aware_nmap_args(target: str, base_args: str, scan_profile: str) -> str:
-    """Build nmap args - simplified for trial"""
-    # Deduplicate args from frontend
-    args_set = set(base_args.split())
-    final_args = ' '.join(sorted(args_set))
-    
-    print(f"✓ Built nmap command for {target}: {final_args}")
-    return final_args
+    """Build nmap args - pass through arguments from frontend"""
+    # Simply return the args as-is to preserve all flags and options
+    print(f"✓ Using nmap arguments for {target}: {base_args}")
+    return base_args
 
 def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, follow_up: bool = False) -> Dict[str, Any]:
     """
