@@ -6,6 +6,10 @@ Startup script for the VulnScan AI Backend
 import uvicorn
 import os
 import sys
+import logging
+
+# Configure logging to suppress invalid HTTP request warnings
+logging.getLogger("uvicorn.error").setLevel(logging.ERROR)
 
 def main():
     print("🚀 Starting VulnScan AI Backend...")
@@ -20,7 +24,29 @@ def main():
             host="0.0.0.0",
             port=8000,
             reload=True,
-            log_level="info"
+            log_level="info",
+            access_log=True,
+            log_config={
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "default": {
+                        "format": "%(levelname)s: %(message)s",
+                    },
+                },
+                "handlers": {
+                    "default": {
+                        "formatter": "default",
+                        "class": "logging.StreamHandler",
+                        "stream": "ext://sys.stdout",
+                    },
+                },
+                "loggers": {
+                    "uvicorn": {"handlers": ["default"], "level": "INFO"},
+                    "uvicorn.error": {"level": "ERROR"},
+                    "uvicorn.access": {"handlers": ["default"], "level": "INFO"},
+                },
+            }
         )
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
