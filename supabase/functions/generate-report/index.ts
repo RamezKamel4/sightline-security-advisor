@@ -160,11 +160,16 @@ Group all findings by severity:
 
 Order vulnerabilities by severity within each group.
 
-## 4. TECHNICAL APPENDIX
+## 4. SCAN METHODOLOGY & LIMITATIONS
+Provide a brief technical explanation covering:
+- Why some service banners appeared as "unknown" (Nmap version detection limitations, firewall filtering, IPS restrictions, or services configured to suppress banner information)
+- Why only certain ports were scanned (explain the scan profile used, e.g., web-apps profile focusing on web-related services, deliberately excluding system-level ports like SMB or NetBIOS)
+- How environmental restrictions and deliberate scan scope affected version detection capabilities
+
+## 5. TECHNICAL APPENDIX
 Include raw technical details:
 - Open ports discovered
 - Service banners and versions detected
-- Nmap commands used for scanning
 - Raw tool outputs (keep this separate from executive summary)
 
 ## STYLE REQUIREMENTS:
