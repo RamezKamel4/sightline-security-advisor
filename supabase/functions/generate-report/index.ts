@@ -163,6 +163,7 @@ Order vulnerabilities by severity within each group.
 Include raw technical details:
 - Open ports discovered
 - Service banners and versions detected
+- Nmap commands used for scanning
 - Raw tool outputs (keep this separate from executive summary)
 
 ## STYLE REQUIREMENTS:
