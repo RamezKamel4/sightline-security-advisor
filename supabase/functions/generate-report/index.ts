@@ -91,6 +91,7 @@ serve(async (req) => {
     }
 
     console.log('Findings retrieved:', findings?.length || 0, 'findings');
+    console.log('Findings ports:', findings?.map(f => f.port).join(', '));
 
     // Get CVE details for all findings with CVE IDs
     const cveIds = findings?.filter(f => f.cve_id).map(f => f.cve_id) || [];

@@ -97,21 +97,27 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 };
 
 const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
-  for (const result of scanResults) {
-    const { error: findingError } = await supabase
-      .from('findings')
-      .insert({
-        scan_id: scanId,
-        port: result.port,
-        service_name: result.service,
-        service_version: result.version,
-        cve_id: result.cves.length > 0 ? result.cves[0].id : null
-      });
-    
-    if (findingError) {
-      console.error('❌ Error storing finding:', findingError);
-    }
+  console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.port}/${r.service}`).join(', '));
+  
+  const findingsToInsert = scanResults.map(result => ({
+    scan_id: scanId,
+    port: result.port,
+    service_name: result.service,
+    service_version: result.version || 'unknown',
+    cve_id: null  // CVE enrichment will happen during report generation
+  }));
+
+  const { data, error: findingError } = await supabase
+    .from('findings')
+    .insert(findingsToInsert)
+    .select();
+  
+  if (findingError) {
+    console.error('❌ Error storing findings:', findingError);
+    throw new Error(`Failed to store findings: ${findingError.message}`);
   }
+  
+  console.log('✅ Successfully stored', data?.length || 0, 'findings');
 };
 
 // Re-export report generation for backwards compatibility
