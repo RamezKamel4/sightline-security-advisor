@@ -1,17 +1,32 @@
 import requests
 import traceback
+import os
 from typing import List, Dict, Any
-from supabase import create_client, Client   # 🚀 NEW
+from supabase import create_client, Client
 
-# 🚀 Supabase connection
-SUPABASE_URL = "https://YOUR-PROJECT-URL.supabase.co"
-SUPABASE_KEY = "YOUR-SERVICE-ROLE-KEY"  # use service_role for inserts
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# 🚀 Supabase connection - read from environment variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Only create client if credentials are available
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✅ Supabase client initialized for CVE storage")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize Supabase client: {e}")
+else:
+    print("⚠️ Supabase credentials not found - CVE storage disabled")
 
 def save_cves_to_supabase(cves: List[Dict[str, Any]]):
     """
     Save CVEs into Supabase `cve` table, avoiding duplicates.
     """
+    if not supabase:
+        print("⚠️ Supabase client not available - skipping CVE storage")
+        return
+    
     for cve in cves:
         try:
             supabase.table("cve").upsert({
