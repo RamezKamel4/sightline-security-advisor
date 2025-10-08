@@ -105,7 +105,7 @@ const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise
         port: result.port,
         service_name: result.service,
         service_version: result.version,
-        cve_id: result.cves.length > 0 ? result.cves[0].id : null
+        cve_id: null  // CVE enrichment happens later when report is generated
       });
     
     if (findingError) {
