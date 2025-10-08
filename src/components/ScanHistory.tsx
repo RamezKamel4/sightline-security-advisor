@@ -150,6 +150,7 @@ export const ScanHistory = () => {
                 <tr className="border-b border-slate-200">
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Target</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Profile</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate-600">Depth</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Duration</th>
@@ -163,6 +164,7 @@ export const ScanHistory = () => {
                       <div className="font-medium text-slate-900">{scan.target}</div>
                     </td>
                     <td className="py-4 px-4 text-slate-600">{scan.profile || 'Unknown'}</td>
+                    <td className="py-4 px-4 text-slate-600">{scan.scan_depth || 'N/A'}</td>
                     <td className="py-4 px-4">
                       <Badge className={getStatusBadge(scan.status || 'unknown')}>
                         {scan.status || 'unknown'}
