@@ -56,6 +56,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     
     // Update scan status to completed and store nmap command + host info
     console.log('💾 Updating scan status to completed...');
+    console.log('📝 Command to be saved:', scanResponse.nmapCmd);
     await supabase
       .from('scans')
       .update({

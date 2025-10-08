@@ -87,8 +87,9 @@ export const executeScan = async (
   }
 
   const scanData: ScanResponse = await response.json();
-  console.log('Scan command used:', scanData.nmap_cmd);
-  console.log('Scan results:', scanData.results);
+  console.log('✅ INITIAL SCAN COMMAND:', scanData.nmap_cmd);
+  console.log('✅ Nmap args sent to backend:', nmapArgs);
+  console.log('📊 Scan results:', scanData.results);
 
   // Check for services with unknown versions and run follow-up scans
   const unknownServices = scanData.results.filter(s => !s.version || s.version.toLowerCase() === 'unknown');
