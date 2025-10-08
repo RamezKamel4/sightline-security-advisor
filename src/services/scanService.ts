@@ -63,7 +63,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         end_time: new Date().toISOString(),
         nmap_cmd: scanResponse.nmapCmd,
         nmap_output: scanResponse.nmapOutput,
-        host_info: scanResponse.hostInfo || null
+        host_info: scanResponse.hostInfo as any || null
       })
       .eq('scan_id', scan.scan_id);
 

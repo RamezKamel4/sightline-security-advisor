@@ -103,7 +103,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
         .single();
 
       if (error) throw error;
-      setHostInfo(data?.host_info || null);
+      setHostInfo((data as any)?.host_info || null);
     } catch (error) {
       console.error('Error fetching host info:', error);
     }

@@ -115,6 +115,7 @@ export type Database = {
       scans: {
         Row: {
           end_time: string | null
+          host_info: Json | null
           nmap_cmd: string | null
           nmap_output: string | null
           profile: string | null
@@ -129,6 +130,7 @@ export type Database = {
         }
         Insert: {
           end_time?: string | null
+          host_info?: Json | null
           nmap_cmd?: string | null
           nmap_output?: string | null
           profile?: string | null
@@ -143,6 +145,7 @@ export type Database = {
         }
         Update: {
           end_time?: string | null
+          host_info?: Json | null
           nmap_cmd?: string | null
           nmap_output?: string | null
           profile?: string | null
