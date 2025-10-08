@@ -78,14 +78,22 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
   } catch (error) {
     console.error('❌ Scan execution error:', error);
     
-    // Update scan status to failed
-    await supabase
-      .from('scans')
-      .update({
-        status: 'failed',
-        end_time: new Date().toISOString()
-      })
-      .eq('scan_id', scan.scan_id);
+    // Update scan status to failed - ensure this always happens
+    try {
+      const { error: updateError } = await supabase
+        .from('scans')
+        .update({
+          status: 'failed',
+          end_time: new Date().toISOString()
+        })
+        .eq('scan_id', scan.scan_id);
+      
+      if (updateError) {
+        console.error('❌ Failed to update scan status:', updateError);
+      }
+    } catch (updateErr) {
+      console.error('❌ Exception updating scan status:', updateErr);
+    }
     
     // If it's a network error, provide helpful message
     if (error instanceof TypeError && error.message.includes('fetch')) {
