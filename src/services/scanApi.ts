@@ -4,7 +4,7 @@ type ProfileKey = 'web-apps' | 'databases' | 'remote-access' | 'comprehensive';
 const scanDepthMapping: Record<DepthKey, string> = {
   'fast': '-T4',
   'deep': '-T4 -sV -O',
-  'aggressive': '-T4 -A -sC -sV --script vuln'
+  'aggressive': '-T4 -A -sC -sV'
 };
 
 const scanProfilePorts: Record<ProfileKey, string> = {
