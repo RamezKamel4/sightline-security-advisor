@@ -104,69 +104,68 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 "error": f"Host {ip_address} not found or not scannable."
             }
         
-        host = hosts_list[0]
-        host_data = nm[host]
+        print(f"🌐 Found {len(hosts_list)} host(s) in scan")
         
-        # Extract host metadata (OS detection, MAC, latency, etc.)
-        if not follow_up:
-            print(f"🖥️  Extracting host information...")
+        # Process ALL hosts from the scan (important for subnet scans)
+        for host in hosts_list:
+            host_data = nm[host]
             
-            # OS Detection
-            os_matches = host_data.get('osmatch', [])
-            if os_matches:
-                host_info['os_matches'] = [
-                    {
-                        'name': match.get('name', 'Unknown'),
-                        'accuracy': match.get('accuracy', 0),
-                        'os_class': match.get('osclass', [])
+            # Extract host metadata (OS detection, MAC, latency, etc.) for first host only
+            if not follow_up and host == hosts_list[0]:
+                print(f"🖥️  Extracting host information for {host}...")
+                
+                # OS Detection
+                os_matches = host_data.get('osmatch', [])
+                if os_matches:
+                    host_info['os_matches'] = [
+                        {
+                            'name': match.get('name', 'Unknown'),
+                            'accuracy': match.get('accuracy', 0),
+                            'os_class': match.get('osclass', [])
+                        }
+                        for match in os_matches[:3]  # Top 3 matches
+                    ]
+                    print(f"🎯 OS Detection: {os_matches[0].get('name')} ({os_matches[0].get('accuracy')}% accuracy)")
+                
+                # MAC Address
+                addresses = host_data.get('addresses', {})
+                if 'mac' in addresses:
+                    host_info['mac_address'] = addresses['mac']
+                    vendor = host_data.get('vendor', {}).get(addresses['mac'], 'Unknown')
+                    host_info['mac_vendor'] = vendor
+                    print(f"📡 MAC Address: {addresses['mac']} ({vendor})")
+                
+                # Host state and latency
+                if 'status' in host_data:
+                    host_info['state'] = host_data['status'].get('state', 'unknown')
+                    host_info['reason'] = host_data['status'].get('reason', 'unknown')
+                
+                # Uptime (if available)
+                if 'uptime' in host_data:
+                    host_info['uptime'] = {
+                        'seconds': host_data['uptime'].get('seconds', 0),
+                        'lastboot': host_data['uptime'].get('lastboot', '')
                     }
-                    for match in os_matches[:3]  # Top 3 matches
-                ]
-                print(f"🎯 OS Detection: {os_matches[0].get('name')} ({os_matches[0].get('accuracy')}% accuracy)")
-            
-            # MAC Address
-            addresses = host_data.get('addresses', {})
-            if 'mac' in addresses:
-                host_info['mac_address'] = addresses['mac']
-                vendor = host_data.get('vendor', {}).get(addresses['mac'], 'Unknown')
-                host_info['mac_vendor'] = vendor
-                print(f"📡 MAC Address: {addresses['mac']} ({vendor})")
-            
-            # Host state and latency
-            if 'status' in host_data:
-                host_info['state'] = host_data['status'].get('state', 'unknown')
-                host_info['reason'] = host_data['status'].get('reason', 'unknown')
-            
-            # Uptime (if available)
-            if 'uptime' in host_data:
-                host_info['uptime'] = {
-                    'seconds': host_data['uptime'].get('seconds', 0),
-                    'lastboot': host_data['uptime'].get('lastboot', '')
-                }
-            
-            # Distance (network hops)
-            if 'distance' in host_data:
-                host_info['distance'] = host_data['distance']
-                print(f"🌐 Network distance: {host_data['distance']} hops")
-            
-            # Hostname
-            hostnames = host_data.get('hostnames', [])
-            if hostnames:
-                host_info['hostnames'] = [h.get('name', '') for h in hostnames if h.get('name')]
-                print(f"🏷️  Hostname: {', '.join(host_info['hostnames'])}")
+                
+                # Distance (network hops)
+                if 'distance' in host_data:
+                    host_info['distance'] = host_data['distance']
+                    print(f"🌐 Network distance: {host_data['distance']} hops")
+                
+                # Hostname
+                hostnames = host_data.get('hostnames', [])
+                if hostnames:
+                    host_info['hostnames'] = [h.get('name', '') for h in hostnames if h.get('name')]
+                    print(f"🏷️  Hostname: {', '.join(host_info['hostnames'])}")
 
-        if 'tcp' not in host_data or not host_data['tcp']:
-            return {
-                "results": [],
-                "nmap_cmd": full_command,
-                "nmap_output": nm.csv() if hasattr(nm, 'csv') else str(nm.all_hosts()),
-                "message": f"No open TCP ports found on {ip_address}."
-            }
-        
-        tcp_ports = host_data['tcp']
-        print(f"🔓 Found {len(tcp_ports)} TCP ports: {list(tcp_ports.keys())}")
+            if 'tcp' not in host_data or not host_data['tcp']:
+                print(f"ℹ️  No open TCP ports found on {host}")
+                continue
+            
+            tcp_ports = host_data['tcp']
+            print(f"🔓 Host {host}: Found {len(tcp_ports)} TCP ports: {list(tcp_ports.keys())}")
 
-        for port, port_info in tcp_ports.items():
+            for port, port_info in tcp_ports.items():
             service_name = port_info.get('name', 'unknown')
             product = port_info.get('product', '').strip()
             version_str = port_info.get('version', '').strip()
@@ -197,10 +196,10 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                     traceback.print_exc()
                     service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
 
-            results.append(service_data)
+                results.append(service_data)
 
         print(f"✅ Scan completed successfully")
-        print(f"📊 Found {len(results)} services")
+        print(f"📊 Found {len(results)} services across {len(hosts_list)} host(s)")
         
         # Return results, metadata, and host information
         return {

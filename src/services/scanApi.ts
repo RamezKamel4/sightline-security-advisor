@@ -91,10 +91,13 @@ export const executeScan = async (
   console.log('✅ Nmap args sent to backend:', nmapArgs);
   console.log('📊 Scan results:', scanData.results);
 
-  // Check for services with unknown versions and run follow-up scans
+  // Skip follow-up scans for subnet/CIDR scans (e.g., 192.168.1.0/24)
+  const isSubnetScan = target.includes('/');
+  
+  // Check for services with unknown versions and run follow-up scans (only for single host scans)
   const unknownServices = scanData.results.filter(s => !s.version || s.version.toLowerCase() === 'unknown');
   
-  if (unknownServices.length > 0) {
+  if (unknownServices.length > 0 && !isSubnetScan) {
     console.log(`Found ${unknownServices.length} services with unknown version, running follow-up scans...`);
     
     for (const service of unknownServices) {
