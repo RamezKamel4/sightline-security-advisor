@@ -241,9 +241,17 @@ Use simple words. No technical jargon. Be clear and practical.`;
                                                   </div>
                                                 );
                                               }
-                                              const boldFormatted = line.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>');
+                                              // Handle bold text (**text**) safely without dangerouslySetInnerHTML
+                                              const parts = line.split(/(\*\*.*?\*\*)/g);
                                               return (
-                                                <p key={lineIdx} className="mb-1" dangerouslySetInnerHTML={{ __html: boldFormatted }} />
+                                                <p key={lineIdx} className="mb-1">
+                                                  {parts.map((part, partIdx) => {
+                                                    if (part.startsWith('**') && part.endsWith('**')) {
+                                                      return <strong key={partIdx} className="font-semibold">{part.slice(2, -2)}</strong>;
+                                                    }
+                                                    return <span key={partIdx}>{part}</span>;
+                                                  })}
+                                                </p>
                                               );
                                             })}
                                           </div>

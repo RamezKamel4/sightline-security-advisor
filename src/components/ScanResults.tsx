@@ -413,10 +413,17 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                           </div>
                         );
                       }
-                      // Handle bold text (**text**)
-                      const boldFormatted = line.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+                      // Handle bold text (**text**) safely without dangerouslySetInnerHTML
+                      const parts = line.split(/(\*\*.*?\*\*)/g);
                       return (
-                        <p key={lineIndex} className="mb-2" dangerouslySetInnerHTML={{ __html: boldFormatted }} />
+                        <p key={lineIndex} className="mb-2">
+                          {parts.map((part, partIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={partIdx} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
+                            }
+                            return <span key={partIdx}>{part}</span>;
+                          })}
+                        </p>
                       );
                     })}
                   </div>
