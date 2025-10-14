@@ -166,35 +166,35 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
             print(f"🔓 Host {host}: Found {len(tcp_ports)} TCP ports: {list(tcp_ports.keys())}")
 
             for port, port_info in tcp_ports.items():
-            service_name = port_info.get('name', 'unknown')
-            product = port_info.get('product', '').strip()
-            version_str = port_info.get('version', '').strip()
-            display_version = f"{product} {version_str}".strip() or "unknown"
+                service_name = port_info.get('name', 'unknown')
+                product = port_info.get('product', '').strip()
+                version_str = port_info.get('version', '').strip()
+                display_version = f"{product} {version_str}".strip() or "unknown"
 
-            # Decide what to search in CVE DB
-            search_service_name = product or service_name
-            search_version = version_str or "unknown"
+                # Decide what to search in CVE DB
+                search_service_name = product or service_name
+                search_version = version_str or "unknown"
 
-            print(f"🔍 Port {port}: {service_name} - {display_version}")
+                print(f"🔍 Port {port}: {service_name} - {display_version}")
 
-            service_data = {
-                "host": host,
-                "port": port,
-                "service": service_name,
-                "version": display_version,
-                "cves": []
-            }
+                service_data = {
+                    "host": host,
+                    "port": port,
+                    "service": service_name,
+                    "version": display_version,
+                    "cves": []
+                }
 
-            # CVE enrichment
-            if search_service_name.lower() != "unknown":
-                try:
-                    cves = fetch_cves_for_service(search_service_name, search_version)
-                    service_data["cves"] = cves
-                    print(f"📄 Found {len(cves)} CVEs for {search_service_name}")
-                except Exception as e:
-                    print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
-                    traceback.print_exc()
-                    service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
+                # CVE enrichment
+                if search_service_name.lower() != "unknown":
+                    try:
+                        cves = fetch_cves_for_service(search_service_name, search_version)
+                        service_data["cves"] = cves
+                        print(f"📄 Found {len(cves)} CVEs for {search_service_name}")
+                    except Exception as e:
+                        print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
+                        traceback.print_exc()
+                        service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
 
                 results.append(service_data)
 

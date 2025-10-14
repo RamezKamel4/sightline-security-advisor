@@ -8,10 +8,17 @@ from routes.scan_routes import router as scan_router
 
 app = FastAPI(title="VulnScan AI Backend", version="1.0.0")
 
-# Add CORS middleware with explicit POST method support
+# Allowed origins for CORS - restrict to specific domains
+ALLOWED_ORIGINS = [
+    "https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com",  # Production
+    "http://localhost:5173",  # Local development
+    "http://localhost:3000",  # Alternative local port
+]
+
+# Add CORS middleware with restricted origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
