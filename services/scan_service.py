@@ -89,43 +89,8 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 nmap_args += f" --script {extra_scripts}"
             print(f"📝 Follow-up scan using scripts: {extra_scripts}")
         
-        # Expand CIDR/range targets into a comma-separated hosts string so nmap scans all addresses
-        def expand_targets(target: str) -> List[str]:
-            target = target.strip()
-            # CIDR notation
-            if '/' in target:
-                try:
-                    net = ipaddress.ip_network(target, strict=False)
-                    # include all addresses (network, hosts, broadcast) to mirror GUI tools like Zenmap
-                    return [str(ip) for ip in net]
-                except Exception:
-                    return [target]
-
-            # Simple range like 192.168.1.1-50 or 192.168.1.1-192.168.1.50
-            if '-' in target:
-                try:
-                    left, right = target.split('-', 1)
-                    left = left.strip()
-                    right = right.strip()
-                    if '.' in right:
-                        start = ipaddress.IPv4Address(left)
-                        end = ipaddress.IPv4Address(right)
-                        return [str(ip) for ip in ipaddress.summarize_address_range(start, end)] if start and end else [target]
-                    else:
-                        # assume last-octet range
-                        parts = left.split('.')
-                        base = '.'.join(parts[:-1])
-                        start_oct = int(parts[-1])
-                        end_oct = int(right)
-                        return [f"{base}.{i}" for i in range(start_oct, end_oct + 1)]
-                except Exception:
-                    return [target]
-
-            # Single host
-            return [target]
-
-        targets_list = expand_targets(ip_address)
-        hosts_arg = ','.join(targets_list)
+        # Pass target directly to nmap - it handles CIDR, ranges, and single hosts natively
+        hosts_arg = ip_address.strip()
 
         # Build full command for logging
         full_command = f"nmap {nmap_args} {hosts_arg}"
