@@ -193,37 +193,89 @@ Include raw technical details:
 
 Generate the complete report now.`;
 
-    console.log('Making Gemini API request...');
+    console.log('Making Gemini API request with retry logic...');
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': geminiApiKey,
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4096,
+    let geminiResponse;
+    let lastError;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Attempt ${attempt}/${maxRetries} to call Gemini API...`);
+        
+        geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': geminiApiKey,
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: prompt }]
+            }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4096,
+            }
+          }),
+        });
+
+        console.log('Gemini response status:', geminiResponse.status);
+
+        // Success - break out of retry loop
+        if (geminiResponse.ok) {
+          break;
         }
-      }),
-    });
 
-    console.log('Gemini response status:', geminiResponse.status);
+        // Handle retryable errors (503 Service Unavailable, 429 Rate Limit)
+        if (geminiResponse.status === 503 || geminiResponse.status === 429) {
+          const errorText = await geminiResponse.text();
+          lastError = errorText;
+          console.error(`Gemini API error (attempt ${attempt}/${maxRetries}) - Status:`, geminiResponse.status);
+          console.error('Error response:', errorText);
+          
+          // Don't retry on last attempt
+          if (attempt < maxRetries) {
+            const delayMs = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+            console.log(`Retrying after ${delayMs}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            continue;
+          }
+        } else {
+          // Non-retryable error
+          const errorText = await geminiResponse.text();
+          console.error('Gemini API error - Status:', geminiResponse.status);
+          console.error('Gemini API error - Response:', errorText);
+          
+          return new Response(JSON.stringify({ 
+            error: `Gemini API error (${geminiResponse.status})`,
+            details: errorText
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } catch (fetchError) {
+        console.error(`Fetch error on attempt ${attempt}:`, fetchError);
+        lastError = fetchError instanceof Error ? fetchError.message : 'Network error';
+        
+        if (attempt < maxRetries) {
+          const delayMs = Math.pow(2, attempt - 1) * 1000;
+          console.log(`Retrying after ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error('Gemini API error - Status:', geminiResponse.status);
-      console.error('Gemini API error - Response:', errorText);
-      
+    // If we exhausted all retries
+    if (!geminiResponse || !geminiResponse.ok) {
+      console.error('Failed after all retry attempts');
       return new Response(JSON.stringify({ 
-        error: `Gemini API error (${geminiResponse.status})`,
-        details: errorText
+        error: 'Gemini API is temporarily unavailable',
+        details: 'The AI service is overloaded. Please try again in a few minutes.',
+        technicalDetails: lastError
       }), {
-        status: 500,
+        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
