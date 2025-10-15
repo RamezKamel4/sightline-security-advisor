@@ -106,9 +106,19 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         
         print(f"🌐 Found {len(hosts_list)} host(s) in scan")
         
+        # Track discovered hosts
+        discovered_hosts = []
+        
         # Process ALL hosts from the scan (important for subnet scans)
         for host in hosts_list:
             host_data = nm[host]
+            
+            # Track this host as discovered
+            host_state = host_data.get('status', {}).get('state', 'unknown')
+            discovered_hosts.append({
+                'ip': host,
+                'state': host_state
+            })
             
             # Extract host metadata (OS detection, MAC, latency, etc.) for first host only
             if not follow_up and host == hosts_list[0]:
@@ -201,12 +211,18 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         print(f"✅ Scan completed successfully")
         print(f"📊 Found {len(results)} services across {len(hosts_list)} host(s)")
         
+        # If no open ports found but hosts were discovered, add helpful message
+        if not results and discovered_hosts:
+            print(f"⚠️  Discovered {len(discovered_hosts)} host(s) but no open ports found")
+            print(f"💡 This usually means ports are filtered by a firewall")
+        
         # Return results, metadata, and host information
         return {
             "results": results,
             "nmap_cmd": full_command,
             "nmap_output": nm.csv() if hasattr(nm, 'csv') else str(nm.all_hosts()),
-            "host_info": host_info if host_info else None
+            "host_info": host_info if host_info else None,
+            "discovered_hosts": discovered_hosts if not results else None
         }
 
     except nmap.PortScannerError as e:
