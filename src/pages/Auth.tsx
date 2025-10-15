@@ -14,6 +14,7 @@ const Auth = () => {
   const [isUpdatePasswordMode, setIsUpdatePasswordMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
@@ -37,6 +38,27 @@ const Auth = () => {
 
     try {
       if (isUpdatePasswordMode) {
+        // Validate passwords match
+        if (password !== confirmPassword) {
+          toast({
+            title: "Password Mismatch",
+            description: "Passwords do not match. Please try again.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (password.length < 6) {
+          toast({
+            title: "Password Too Short",
+            description: "Password must be at least 6 characters long.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await updatePassword(password);
         if (error) {
           toast({
@@ -47,11 +69,12 @@ const Auth = () => {
         } else {
           toast({
             title: "Success!",
-            description: "Password updated successfully. You can now sign in.",
+            description: "Password updated successfully. You can now sign in with your new password.",
           });
           setIsUpdatePasswordMode(false);
           setIsLogin(true);
           setPassword('');
+          setConfirmPassword('');
         }
       } else if (isResetMode) {
         const { error } = await resetPassword(email);
@@ -139,20 +162,39 @@ const Auth = () => {
               )}
               
               {!isResetMode && (
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                    {isUpdatePasswordMode ? 'New Password' : 'Password'}
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isUpdatePasswordMode ? "Enter your new password" : "Enter your password"}
-                    required
-                    minLength={6}
-                  />
-                </div>
+                <>
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
+                      {isUpdatePasswordMode ? 'New Password' : 'Password'}
+                    </label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={isUpdatePasswordMode ? "Enter your new password" : "Enter your password"}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  
+                  {isUpdatePasswordMode && (
+                    <div>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-1">
+                        Confirm New Password
+                      </label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm your new password"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               <Button 
@@ -210,6 +252,7 @@ const Auth = () => {
                     setIsUpdatePasswordMode(false);
                     setIsLogin(true);
                     setPassword('');
+                    setConfirmPassword('');
                   }}
                   className="text-blue-600 hover:text-blue-800 text-sm"
                 >
