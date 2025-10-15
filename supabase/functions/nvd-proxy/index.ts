@@ -61,15 +61,27 @@ serve(async (req) => {
       );
     }
 
-    // Parse query parameters
+    // Parse both query parameters and request body
     const url = new URL(req.url);
-    const cveId = url.searchParams.get('cveId');
-    const cpeName = url.searchParams.get('cpeName');
-    const keywordSearch = url.searchParams.get('keywordSearch');
+    let cveId = url.searchParams.get('cveId');
+    let cpeName = url.searchParams.get('cpeName');
+    let keywordSearch = url.searchParams.get('keywordSearch');
+
+    // If no query params, try to parse request body
+    if (!cveId && !cpeName && !keywordSearch && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        cveId = body.cveId;
+        cpeName = body.cpeName;
+        keywordSearch = body.keywordSearch;
+      } catch (e) {
+        console.error('Failed to parse request body:', e);
+      }
+    }
 
     if (!cveId && !cpeName && !keywordSearch) {
       return new Response(
-        JSON.stringify({ error: 'Either cveId, cpeName, or keywordSearch query parameter is required' }),
+        JSON.stringify({ error: 'Either cveId, cpeName, or keywordSearch is required (query parameter or request body)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
