@@ -39,26 +39,32 @@ export type Database = {
         Row: {
           cve_id: string | null
           finding_id: string
+          host: string | null
           port: number
           scan_id: string
           service_name: string
           service_version: string | null
+          state: string | null
         }
         Insert: {
           cve_id?: string | null
           finding_id?: string
+          host?: string | null
           port: number
           scan_id: string
           service_name: string
           service_version?: string | null
+          state?: string | null
         }
         Update: {
           cve_id?: string | null
           finding_id?: string
+          host?: string | null
           port?: number
           scan_id?: string
           service_name?: string
           service_version?: string | null
+          state?: string | null
         }
         Relationships: [
           {

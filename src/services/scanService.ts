@@ -105,11 +105,13 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 };
 
 const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
-  console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.port}/${r.service}`).join(', '));
+  console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.host}:${r.port}/${r.service} (${r.state})`).join(', '));
   
   const findingsToInsert = scanResults.map(result => ({
     scan_id: scanId,
+    host: result.host,
     port: result.port,
+    state: result.state,
     service_name: result.service,
     service_version: result.version || 'unknown',
     cve_id: null  // CVE enrichment will happen during report generation
