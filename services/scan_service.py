@@ -106,19 +106,9 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         
         print(f"🌐 Found {len(hosts_list)} host(s) in scan")
         
-        # Track discovered hosts
-        discovered_hosts = []
-        
         # Process ALL hosts from the scan (important for subnet scans)
         for host in hosts_list:
             host_data = nm[host]
-            
-            # Track this host as discovered
-            host_state = host_data.get('status', {}).get('state', 'unknown')
-            discovered_hosts.append({
-                'ip': host,
-                'state': host_state
-            })
             
             # Extract host metadata (OS detection, MAC, latency, etc.) for first host only
             if not follow_up and host == hosts_list[0]:
@@ -168,14 +158,16 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                     host_info['hostnames'] = [h.get('name', '') for h in hostnames if h.get('name')]
                     print(f"🏷️  Hostname: {', '.join(host_info['hostnames'])}")
 
+            # Process ALL TCP ports (open, filtered, closed)
             if 'tcp' not in host_data or not host_data['tcp']:
-                print(f"ℹ️  No open TCP ports found on {host}")
+                print(f"ℹ️  No TCP port data found for {host}")
                 continue
             
             tcp_ports = host_data['tcp']
-            print(f"🔓 Host {host}: Found {len(tcp_ports)} TCP ports: {list(tcp_ports.keys())}")
+            print(f"🔓 Host {host}: Found {len(tcp_ports)} TCP ports with states: {list(tcp_ports.keys())}")
 
             for port, port_info in tcp_ports.items():
+                port_state = port_info.get('state', 'unknown')
                 service_name = port_info.get('name', 'unknown')
                 product = port_info.get('product', '').strip()
                 version_str = port_info.get('version', '').strip()
@@ -185,18 +177,19 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 search_service_name = product or service_name
                 search_version = version_str or "unknown"
 
-                print(f"🔍 Port {port}: {service_name} - {display_version}")
+                print(f"🔍 Port {port} ({port_state}): {service_name} - {display_version}")
 
                 service_data = {
                     "host": host,
                     "port": port,
+                    "state": port_state,
                     "service": service_name,
                     "version": display_version,
                     "cves": []
                 }
 
-                # CVE enrichment
-                if search_service_name.lower() != "unknown":
+                # CVE enrichment only for open ports with known services
+                if port_state == "open" and search_service_name.lower() != "unknown":
                     try:
                         cves = fetch_cves_for_service(search_service_name, search_version)
                         service_data["cves"] = cves
@@ -209,20 +202,14 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 results.append(service_data)
 
         print(f"✅ Scan completed successfully")
-        print(f"📊 Found {len(results)} services across {len(hosts_list)} host(s)")
-        
-        # If no open ports found but hosts were discovered, add helpful message
-        if not results and discovered_hosts:
-            print(f"⚠️  Discovered {len(discovered_hosts)} host(s) but no open ports found")
-            print(f"💡 This usually means ports are filtered by a firewall")
+        print(f"📊 Found {len(results)} port entries across {len(hosts_list)} host(s)")
         
         # Return results, metadata, and host information
         return {
             "results": results,
             "nmap_cmd": full_command,
             "nmap_output": nm.csv() if hasattr(nm, 'csv') else str(nm.all_hosts()),
-            "host_info": host_info if host_info else None,
-            "discovered_hosts": discovered_hosts if not results else None
+            "host_info": host_info if host_info else None
         }
 
     except nmap.PortScannerError as e:

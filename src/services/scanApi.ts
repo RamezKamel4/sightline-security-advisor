@@ -44,6 +44,7 @@ export interface HostInfo {
 export interface ScanResult {
   host: string;
   port: number;
+  state: string;
   service: string;
   version: string;
   cpes?: string[];

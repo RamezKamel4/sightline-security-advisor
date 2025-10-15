@@ -16,7 +16,9 @@ interface ScanResultsProps {
 
 interface Finding {
   finding_id: string;
+  host?: string;
   port: number;
+  state?: string;
   service_name: string;
   service_version: string | null;
   cve_id: string | null;
@@ -317,7 +319,9 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Host</TableHead>
                 <TableHead>Port</TableHead>
+                <TableHead>State</TableHead>
                 <TableHead>Service</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>CVE</TableHead>
@@ -329,7 +333,21 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
             <TableBody>
               {findings.map((finding) => (
                 <TableRow key={finding.finding_id}>
+                  <TableCell className="font-mono text-sm">{finding.host || 'N/A'}</TableCell>
                   <TableCell className="font-medium">{finding.port}</TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline"
+                      className={
+                        finding.state === 'open' ? 'border-green-500 text-green-700' :
+                        finding.state === 'filtered' ? 'border-yellow-500 text-yellow-700' :
+                        finding.state === 'closed' ? 'border-gray-500 text-gray-700' :
+                        'border-blue-500 text-blue-700'
+                      }
+                    >
+                      {finding.state || 'unknown'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{finding.service_name}</TableCell>
                   <TableCell>{finding.service_version || 'Unknown'}</TableCell>
                   <TableCell>

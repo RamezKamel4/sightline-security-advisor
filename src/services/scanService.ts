@@ -54,26 +54,6 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
     );
     
-    // Check if hosts were discovered but no open ports found
-    if (scanResponse.results.length === 0 && (scanResponse as any).discovered_hosts) {
-      const discoveredCount = (scanResponse as any).discovered_hosts.length;
-      console.log(`⚠️ Found ${discoveredCount} host(s) but no open ports - likely filtered by firewall`);
-      
-      // Update scan with warning message
-      await supabase
-        .from('scans')
-        .update({
-          status: 'completed',
-          end_time: new Date().toISOString(),
-          nmap_cmd: scanResponse.nmapCmd,
-          nmap_output: `Discovered ${discoveredCount} host(s) but no open ports found. Ports are likely filtered by a firewall.\n\n${scanResponse.nmapOutput}`,
-          host_info: scanResponse.hostInfo as any || null
-        })
-        .eq('scan_id', scan.scan_id);
-      
-      throw new Error(`Scan found ${discoveredCount} host(s) but no open ports. All ports appear to be filtered by a firewall. Try scanning a single IP with open services instead of a subnet.`);
-    }
-    
     // Update scan status to completed and store nmap command + host info
     console.log('💾 Updating scan status to completed...');
     console.log('📝 Command to be saved:', scanResponse.nmapCmd);
