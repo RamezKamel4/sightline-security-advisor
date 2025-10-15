@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
@@ -20,9 +19,6 @@ interface NewScanModalProps {
 export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalProps) => {
   const [target, setTarget] = useState('');
   const [scanProfile, setScanProfile] = useState('');
-  const [scanDepth, setScanDepth] = useState('fast');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [schedule, setSchedule] = useState('now');
   const [isLoading, setIsLoading] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -42,9 +38,7 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
     const scanData = {
       target,
       scanProfile,
-      scanDepth,
-      username: username || undefined,
-      password: password || undefined,
+      scanDepth: 'fast',
       schedule,
     };
 
@@ -68,9 +62,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
       // Reset form
       setTarget('');
       setScanProfile('');
-      setScanDepth('fast');
-      setUsername('');
-      setPassword('');
       setSchedule('now');
       setPendingScanData(null);
       
@@ -142,77 +133,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
           <Card>
             <CardContent className="p-6">
               <div className="space-y-4">
-                <Label className="text-sm font-medium">Scan Depth</Label>
-                <RadioGroup value={scanDepth} onValueChange={setScanDepth}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="fast" id="fast" />
-                    <Label htmlFor="fast" className="cursor-pointer">
-                      <div>
-                        <div className="font-medium">Fast Scan</div>
-                        <div className="text-xs text-slate-600">Quick port discovery (2-5 minutes)</div>
-                      </div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="deep" id="deep" />
-                    <Label htmlFor="deep" className="cursor-pointer">
-                      <div>
-                        <div className="font-medium">Deep Scan</div>
-                        <div className="text-xs text-slate-600">Service detection and OS fingerprinting (10-20 minutes)</div>
-                      </div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="aggressive" id="aggressive" />
-                    <Label htmlFor="aggressive" className="cursor-pointer">
-                      <div>
-                        <div className="font-medium">Aggressive Scan</div>
-                        <div className="text-xs text-slate-600">Comprehensive vulnerability detection (30+ minutes)</div>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Authentication (Optional)</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="username" className="text-xs text-slate-600">Username</Label>
-                    <Input
-                      id="username"
-                      placeholder="Username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="password" className="text-xs text-slate-600">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-slate-600">
-                  Provide credentials for authenticated scanning (more thorough results)
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
                 <Label className="text-sm font-medium">Schedule</Label>
                 <Select value={schedule} onValueChange={setSchedule}>
                   <SelectTrigger>
@@ -250,7 +170,7 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
         isOpen={showPermissionModal}
         onConfirm={handleConfirmScan}
         onCancel={handleCancelPermission}
-        scanType={`${scanDepth} ${scanProfile}`}
+        scanType={scanProfile}
       />
     </Dialog>
   );
