@@ -16,9 +16,16 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, resetPassword, updatePassword } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Redirect authenticated users to dashboard
+  React.useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   // Detect password recovery from email link
   React.useEffect(() => {
