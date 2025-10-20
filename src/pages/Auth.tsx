@@ -16,16 +16,16 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, resetPassword, updatePassword, user, loading: authLoading } = useAuth();
+  const { signIn, signUp, resetPassword, updatePassword, user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Redirect authenticated users to dashboard
+  // Sign out user if they navigate to auth page while authenticated
   React.useEffect(() => {
     if (!authLoading && user) {
-      navigate('/', { replace: true });
+      signOut();
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, signOut]);
 
   // Detect password recovery from email link
   React.useEffect(() => {
