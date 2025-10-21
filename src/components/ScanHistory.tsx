@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, Search, Filter, Eye } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FileText, Download, Search, Filter, Eye, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScanResults } from './ScanResults';
@@ -28,7 +29,9 @@ export const ScanHistory = () => {
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const [selectedScans, setSelectedScans] = useState<Set<string>>(new Set());
   const [isGeneratingReport, setIsGeneratingReport] = useState<string | null>(null);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,6 +78,59 @@ export const ScanHistory = () => {
     }
   };
 
+  const handleBulkGenerateReports = async () => {
+    if (selectedScans.size === 0) return;
+
+    setIsBulkGenerating(true);
+    const scanIds = Array.from(selectedScans);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const scanId of scanIds) {
+      try {
+        await generateReport(scanId);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate report for scan ${scanId}:`, error);
+        failCount++;
+      }
+    }
+
+    setIsBulkGenerating(false);
+    setSelectedScans(new Set());
+
+    if (successCount > 0) {
+      toast({
+        title: "Bulk Report Generation Complete",
+        description: `Successfully generated ${successCount} report${successCount > 1 ? 's' : ''}${failCount > 0 ? `. ${failCount} failed.` : '.'}`,
+      });
+    } else {
+      toast({
+        title: "Report Generation Failed",
+        description: "Failed to generate any reports",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleScanSelection = (scanId: string) => {
+    const newSelection = new Set(selectedScans);
+    if (newSelection.has(scanId)) {
+      newSelection.delete(scanId);
+    } else {
+      newSelection.add(scanId);
+    }
+    setSelectedScans(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedScans.size === filteredScans.length) {
+      setSelectedScans(new Set());
+    } else {
+      setSelectedScans(new Set(filteredScans.map(s => s.scan_id)));
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       completed: 'bg-green-100 text-green-800',
@@ -112,6 +168,25 @@ export const ScanHistory = () => {
           <h1 className="text-3xl font-bold text-slate-900">Scan History</h1>
           <p className="text-slate-600 mt-1">View and manage your security scans</p>
         </div>
+        {selectedScans.size > 0 && (
+          <Button 
+            onClick={handleBulkGenerateReports}
+            disabled={isBulkGenerating}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {isBulkGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4 mr-2" />
+                Generate {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -148,6 +223,13 @@ export const ScanHistory = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 font-medium text-slate-600 w-12">
+                    <Checkbox
+                      checked={selectedScans.size === filteredScans.length && filteredScans.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all scans"
+                    />
+                  </th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Target</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Profile</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Depth</th>
@@ -160,6 +242,13 @@ export const ScanHistory = () => {
               <tbody>
                 {filteredScans.map((scan) => (
                   <tr key={scan.scan_id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-4 px-4">
+                      <Checkbox
+                        checked={selectedScans.has(scan.scan_id)}
+                        onCheckedChange={() => toggleScanSelection(scan.scan_id)}
+                        aria-label={`Select scan ${scan.target}`}
+                      />
+                    </td>
                     <td className="py-4 px-4">
                       <div className="font-medium text-slate-900">{scan.target}</div>
                     </td>
