@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Shield, Plus, FileText, Settings as SettingsIcon, LogOut, Search, Info } from 'lucide-react';
+import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -33,9 +33,14 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   });
   
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Shield },
-    { id: 'history', label: 'Scan History', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    { id: 'dashboard', label: 'Dashboard', icon: Shield, path: '/' },
+    { id: 'history', label: 'Scan History', icon: FileText, path: '/' },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/' },
+  ];
+
+  const externalMenuItems = [
+    { label: 'How It Works', icon: Info, path: '/workflow' },
+    { label: 'CVE Lookup', icon: Search, path: '/cve-lookup' },
   ];
 
   const handleSignOut = async () => {
@@ -74,24 +79,26 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
               </li>
             );
           })}
-          <li>
-            <Link
-              to="/workflow"
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-300 hover:bg-slate-800 hover:text-white"
-            >
-              <Info className="h-5 w-5" />
-              <span className="font-medium">How It Works</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              to="/cve-lookup"
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-300 hover:bg-slate-800 hover:text-white"
-            >
-              <Search className="h-5 w-5" />
-              <span className="font-medium">CVE Lookup</span>
-            </Link>
-          </li>
+          {externalMenuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <li key={item.path}>
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) => 
+                    `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`
+                  }
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
       
