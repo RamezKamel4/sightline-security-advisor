@@ -16,31 +16,17 @@ const Users = () => {
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['all-users'],
     queryFn: async () => {
-      // Get all users from auth.users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      if (authError) throw authError;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
 
-      // Get all user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
-      if (rolesError) throw rolesError;
+      const { data, error } = await supabase.functions.invoke('list-users', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      // Get user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('users')
-        .select('*');
-      if (profilesError) throw profilesError;
-
-      // Combine data
-      return authUsers.users.map(user => ({
-        id: user.id,
-        email: user.email,
-        created_at: user.created_at,
-        last_sign_in_at: user.last_sign_in_at,
-        roles: userRoles?.filter(r => r.user_id === user.id).map(r => r.role) || [],
-        profile: profiles?.find(p => p.user_id === user.id),
-      }));
+      if (error) throw error;
+      return data.users;
     },
   });
 
