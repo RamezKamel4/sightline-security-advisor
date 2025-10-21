@@ -57,13 +57,13 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   return (
     <div className="w-64 bg-slate-900 text-white flex flex-col">
       <div className="p-6 border-b border-slate-700">
-        <div className="flex items-center space-x-3">
+        <NavLink to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
           <Shield className="h-8 w-8 text-blue-400" />
           <div>
             <h1 className="text-xl font-bold">VulnScan AI</h1>
             <p className="text-slate-400 text-sm">Security Scanner</p>
           </div>
-        </div>
+        </NavLink>
       </div>
       
       <nav className="flex-1 p-4 space-y-6">
