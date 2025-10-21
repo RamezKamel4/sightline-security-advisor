@@ -7,10 +7,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, UserPlus, Shield, Users2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import CreateUserModal from '@/components/CreateUserModal';
+import EditUserModal from '@/components/EditUserModal';
 
 const Users = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   // Fetch all users with their roles
   const { data: users, isLoading, refetch } = useQuery({
@@ -78,9 +83,9 @@ const Users = () => {
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
           <p className="text-muted-foreground">Manage platform users and their roles</p>
         </div>
-        <Button>
+        <Button onClick={() => setCreateModalOpen(true)}>
           <UserPlus className="h-4 w-4 mr-2" />
-          Invite User
+          Create User
         </Button>
       </div>
 
@@ -172,7 +177,14 @@ const Users = () => {
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setEditModalOpen(true);
+                      }}
+                    >
                       Edit
                     </Button>
                   </TableCell>
@@ -182,6 +194,19 @@ const Users = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <CreateUserModal 
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSuccess={refetch}
+      />
+
+      <EditUserModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        user={selectedUser}
+        onSuccess={refetch}
+      />
     </div>
   );
 };
