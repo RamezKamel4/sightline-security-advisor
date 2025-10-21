@@ -12,6 +12,8 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import CVELookup from "./pages/CVELookup";
 import WorkflowGuide from "./pages/WorkflowGuide";
+import Users from "./pages/Users";
+import Analytics from "./pages/Analytics";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,20 @@ const App = () => (
               <ProtectedRoute>
                 <Layout activeView="">
                   <WorkflowGuide />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <Layout activeView="">
+                  <Users />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/analytics" element={
+              <ProtectedRoute>
+                <Layout activeView="">
+                  <Analytics />
                 </Layout>
               </ProtectedRoute>
             } />

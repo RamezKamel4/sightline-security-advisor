@@ -1,11 +1,12 @@
 
 import React from 'react';
-import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info } from 'lucide-react';
+import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface SidebarProps {
   activeView: string;
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const { signOut, user } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   
   // Fetch scans this month
   const { data: scansThisMonth } = useQuery({
@@ -38,6 +40,11 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
     { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/' },
   ];
 
+  const adminMenuItems = [
+    { label: 'Users', icon: Users, path: '/admin/users' },
+    { label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
+  ];
+
   const externalMenuItems = [
     { label: 'How It Works', icon: Info, path: '/workflow' },
     { label: 'CVE Lookup', icon: Search, path: '/cve-lookup' },
@@ -59,47 +66,91 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
         </div>
       </div>
       
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <li key={item.id}>
-                <button
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                    activeView === item.id
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              </li>
-            );
-          })}
-          {externalMenuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) => 
-                    `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      isActive
+      <nav className="flex-1 p-4 space-y-6">
+        <div>
+          <ul className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => onViewChange(item.id)}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                      activeView === item.id
                         ? 'bg-blue-600 text-white shadow-lg'
                         : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`
-                  }
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="font-medium">{item.label}</span>
-                </NavLink>
-              </li>
-            );
-          })}
-        </ul>
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {isAdmin && !roleLoading && (
+          <div>
+            <div className="px-4 mb-2">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Admin
+              </p>
+            </div>
+            <ul className="space-y-2">
+              {adminMenuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.path}>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => 
+                        `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div>
+          <div className="px-4 mb-2">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Resources
+            </p>
+          </div>
+          <ul className="space-y-2">
+            {externalMenuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) => 
+                      `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </NavLink>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </nav>
       
       <div className="p-4 border-t border-slate-700 space-y-4">
