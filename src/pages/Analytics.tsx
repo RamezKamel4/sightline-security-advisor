@@ -28,13 +28,6 @@ const Analytics = () => {
         byProfile[profile] = (byProfile[profile] || 0) + 1;
       });
 
-      // Group by depth
-      const byDepth: Record<string, number> = {};
-      data.forEach(scan => {
-        const depth = scan.scan_depth || 'basic';
-        byDepth[depth] = (byDepth[depth] || 0) + 1;
-      });
-
       // Scans per day (last 7 days)
       const last7Days = [...Array(7)].map((_, i) => {
         const date = new Date();
@@ -53,7 +46,6 @@ const Analytics = () => {
         failed,
         running,
         byProfile: Object.entries(byProfile).map(([name, value]) => ({ name, value })),
-        byDepth: Object.entries(byDepth).map(([name, value]) => ({ name, value })),
         scansByDay,
       };
     },
@@ -215,24 +207,6 @@ const Analytics = () => {
                 <YAxis dataKey="name" type="category" />
                 <Tooltip />
                 <Bar dataKey="value" fill="hsl(var(--chart-2))" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Scans by Depth</CardTitle>
-            <CardDescription>Distribution of scan depths</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={scanStats?.byDepth} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" />
-                <Tooltip />
-                <Bar dataKey="value" fill="hsl(var(--chart-3))" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
