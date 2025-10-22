@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,22 @@ import { Loader2, Search, Sparkles } from 'lucide-react';
 import { searchByServiceName, NVDResponse } from '@/services/nvdService';
 import { useToast } from '@/hooks/use-toast';
 import { chatWithGemini } from '@/services/geminiService';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 const CVELookup = () => {
   const [serviceName, setServiceName] = useState('');
@@ -16,7 +32,14 @@ const CVELookup = () => {
   const [error, setError] = useState<string | null>(null);
   const [analyzingCve, setAnalyzingCve] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<{ [key: string]: string }>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const { toast } = useToast();
+
+  // Reset to page 1 when results change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [result]);
 
   const handleLookup = async () => {
     if (!serviceName.trim()) {
@@ -149,15 +172,49 @@ Use simple words. No technical jargon. Be clear and practical.`;
             {result && (
               <Card className="bg-muted">
                 <CardHeader>
-                  <CardTitle className="text-lg">Results</CardTitle>
-                  <CardDescription>
-                    Total Results: {result.totalResults || 0}
-                  </CardDescription>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-lg">Results</CardTitle>
+                      <CardDescription>
+                        Total Results: {result.totalResults || 0}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Show:</span>
+                      <Select
+                        value={itemsPerPage.toString()}
+                        onValueChange={(value) => {
+                          setItemsPerPage(Number(value));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground">per page</span>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {result.vulnerabilities && result.vulnerabilities.length > 0 ? (
-                    <div className="space-y-4">
-                      {result.vulnerabilities.map((vuln, index) => {
+                    <>
+                      {(() => {
+                        const totalPages = Math.ceil(result.vulnerabilities.length / itemsPerPage);
+                        const startIndex = (currentPage - 1) * itemsPerPage;
+                        const endIndex = startIndex + itemsPerPage;
+                        const paginatedVulnerabilities = result.vulnerabilities.slice(startIndex, endIndex);
+
+                        return (
+                          <>
+                            <div className="space-y-4">
+                              {paginatedVulnerabilities.map((vuln, index) => {
                         const cveId = vuln.cve.id;
                         const description = vuln.cve.descriptions.find(d => d.lang === 'en')?.value || 'No description available';
                         const cvssScore = vuln.cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore;
@@ -264,8 +321,67 @@ Use simple words. No technical jargon. Be clear and practical.`;
                             </CardContent>
                           </Card>
                         );
-                      })}
-                    </div>
+                              })}
+                            </div>
+
+                            {totalPages > 1 && (
+                              <div className="mt-6 space-y-4">
+                                <div className="text-sm text-muted-foreground text-center">
+                                  Showing {startIndex + 1} to {Math.min(endIndex, result.vulnerabilities.length)} of {result.vulnerabilities.length} vulnerabilities
+                                </div>
+                                <Pagination>
+                                  <PaginationContent>
+                                    <PaginationItem>
+                                      <PaginationPrevious
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                      />
+                                    </PaginationItem>
+                                    
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                                      if (
+                                        page === 1 ||
+                                        page === totalPages ||
+                                        (page >= currentPage - 1 && page <= currentPage + 1)
+                                      ) {
+                                        return (
+                                          <PaginationItem key={page}>
+                                            <PaginationLink
+                                              onClick={() => setCurrentPage(page)}
+                                              isActive={currentPage === page}
+                                              className="cursor-pointer"
+                                            >
+                                              {page}
+                                            </PaginationLink>
+                                          </PaginationItem>
+                                        );
+                                      } else if (
+                                        page === currentPage - 2 ||
+                                        page === currentPage + 2
+                                      ) {
+                                        return (
+                                          <PaginationItem key={page}>
+                                            <PaginationEllipsis />
+                                          </PaginationItem>
+                                        );
+                                      }
+                                      return null;
+                                    })}
+                                    
+                                    <PaginationItem>
+                                      <PaginationNext
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                      />
+                                    </PaginationItem>
+                                  </PaginationContent>
+                                </Pagination>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </>
                   ) : (
                     <p className="text-muted-foreground">No vulnerabilities found</p>
                   )}
