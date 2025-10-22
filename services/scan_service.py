@@ -3,6 +3,7 @@ import nmap
 import traceback
 from fastapi import HTTPException
 from services.cve_service import fetch_cves_for_service
+from services.service_probe import probe_http_service, probe_banner, merge_detection_results
 from typing import List, Dict, Any
 import re
 import socket
@@ -183,13 +184,41 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
 
                 print(f"🔍 Port {port} ({port_state}): {service_name} - {display_version}")
 
+                # Enhanced service detection for HTTP/HTTPS services
+                probe_data = {}
+                if port_state == "open" and port in [80, 443, 8000, 8080, 8443, 3000, 5000, 9000]:
+                    print(f"🔬 Performing enhanced detection on {host}:{port}...")
+                    probe_data = probe_http_service(host, port)
+                    
+                    # Merge nmap and probe results
+                    merged = merge_detection_results(service_name, display_version, probe_data)
+                    
+                    # Update display version based on merged results
+                    if merged.get('technologies'):
+                        tech_stack = []
+                        for tech in merged['technologies']:
+                            tech_name = f"{tech['name']} {tech.get('version', '')}".strip()
+                            tech_stack.append(f"{tech_name} ({tech['role']})")
+                        if tech_stack:
+                            display_version = " | ".join(tech_stack)
+                    
+                    print(f"✅ Enhanced detection complete. Confidence: {merged.get('confidence', 0):.1f}%")
+                    if merged.get('conflicts'):
+                        print(f"⚠️ Conflicts detected: {merged['conflicts']}")
+                
                 service_data = {
                     "host": host,
                     "port": port,
                     "state": port_state,
                     "service": service_name,
                     "version": display_version,
-                    "cves": []
+                    "cves": [],
+                    "confidence": probe_data.get('confidence', 50.0) if probe_data else 50.0,
+                    "raw_banner": probe_data.get('raw_banner', ''),
+                    "headers": probe_data.get('headers', {}),
+                    "tls_info": probe_data.get('tls_info', {}),
+                    "proxy_detection": probe_data.get('proxy_detection', {}),
+                    "detection_methods": probe_data.get('detection_methods', ['nmap'])
                 }
 
                 # CVE enrichment only for open ports with known services

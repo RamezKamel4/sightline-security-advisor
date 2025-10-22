@@ -114,7 +114,13 @@ const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise
     state: result.state,
     service_name: result.service,
     service_version: result.version || 'unknown',
-    cve_id: null  // CVE enrichment will happen during report generation
+    cve_id: null,  // CVE enrichment will happen during report generation
+    confidence: (result as any).confidence || 0,
+    raw_banner: (result as any).raw_banner || null,
+    headers: (result as any).headers || null,
+    tls_info: (result as any).tls_info || null,
+    proxy_detection: (result as any).proxy_detection || null,
+    detection_methods: (result as any).detection_methods || null,
   }));
 
   const { data, error: findingError } = await supabase

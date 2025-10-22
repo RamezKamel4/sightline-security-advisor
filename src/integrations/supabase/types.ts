@@ -37,34 +37,52 @@ export type Database = {
       }
       findings: {
         Row: {
+          confidence: number | null
           cve_id: string | null
+          detection_methods: Json | null
           finding_id: string
+          headers: Json | null
           host: string | null
           port: number
+          proxy_detection: Json | null
+          raw_banner: string | null
           scan_id: string
           service_name: string
           service_version: string | null
           state: string | null
+          tls_info: Json | null
         }
         Insert: {
+          confidence?: number | null
           cve_id?: string | null
+          detection_methods?: Json | null
           finding_id?: string
+          headers?: Json | null
           host?: string | null
           port: number
+          proxy_detection?: Json | null
+          raw_banner?: string | null
           scan_id: string
           service_name: string
           service_version?: string | null
           state?: string | null
+          tls_info?: Json | null
         }
         Update: {
+          confidence?: number | null
           cve_id?: string | null
+          detection_methods?: Json | null
           finding_id?: string
+          headers?: Json | null
           host?: string | null
           port?: number
+          proxy_detection?: Json | null
+          raw_banner?: string | null
           scan_id?: string
           service_name?: string
           service_version?: string | null
           state?: string | null
+          tls_info?: Json | null
         }
         Relationships: [
           {

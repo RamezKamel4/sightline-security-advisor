@@ -22,6 +22,12 @@ interface Finding {
   service_name: string;
   service_version: string | null;
   cve_id: string | null;
+  confidence?: number;
+  raw_banner?: string;
+  headers?: any;
+  tls_info?: any;
+  proxy_detection?: any;
+  detection_methods?: any;
   cve?: {
     cve_id: string;
     title: string;
@@ -324,6 +330,8 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                 <TableHead>State</TableHead>
                 <TableHead>Service</TableHead>
                 <TableHead>Version</TableHead>
+                <TableHead>Confidence</TableHead>
+                <TableHead>Proxy/CDN</TableHead>
                 <TableHead>CVE</TableHead>
                 <TableHead>CVSS Score</TableHead>
                 <TableHead>Description</TableHead>
@@ -349,7 +357,44 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                     </Badge>
                   </TableCell>
                   <TableCell>{finding.service_name}</TableCell>
-                  <TableCell>{finding.service_version || 'Unknown'}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div>{finding.service_version || 'Unknown'}</div>
+                      {finding.detection_methods && finding.detection_methods.length > 0 && (
+                        <div className="text-xs text-slate-500">
+                          Methods: {finding.detection_methods.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {finding.confidence !== undefined ? (
+                      <Badge className={
+                        finding.confidence >= 80 ? 'bg-green-600 text-white' :
+                        finding.confidence >= 60 ? 'bg-blue-500 text-white' :
+                        finding.confidence >= 40 ? 'bg-yellow-500 text-white' :
+                        'bg-orange-500 text-white'
+                      }>
+                        {finding.confidence.toFixed(0)}%
+                      </Badge>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {finding.proxy_detection?.detected ? (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="border-purple-500 text-purple-700">
+                          {finding.proxy_detection.provider || 'Proxy'}
+                        </Badge>
+                        {finding.proxy_detection.type && (
+                          <div className="text-xs text-slate-500">{finding.proxy_detection.type}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="secondary">None</Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {finding.cve_id ? (
                       <Badge variant="destructive">{finding.cve_id}</Badge>
