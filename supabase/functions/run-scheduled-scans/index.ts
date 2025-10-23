@@ -21,22 +21,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('🔍 Checking for scheduled scans...');
+    console.log('🔄 Checking for scheduled scans...');
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get all due scheduled scans
-    const { data: dueScans, error: fetchError } = await supabaseClient
-      .rpc('get_due_scheduled_scans');
+    const { data: dueScans, error: fetchError } = await supabase.rpc('get_due_scheduled_scans');
 
     if (fetchError) {
       console.error('❌ Error fetching due scans:', fetchError);
@@ -44,23 +35,21 @@ Deno.serve(async (req) => {
     }
 
     if (!dueScans || dueScans.length === 0) {
-      console.log('✅ No scheduled scans due at this time');
+      console.log('✅ No scans due at this time');
       return new Response(
-        JSON.stringify({ message: 'No scans due', processed: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ message: 'No scans due', processedCount: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    console.log(`📋 Found ${dueScans.length} due scans`);
-    const results = [];
+    console.log(`📋 Found ${dueScans.length} scans to execute`);
 
-    // Process each due scan
+    const results = [];
     for (const scheduledScan of dueScans as ScheduledScan[]) {
       try {
-        console.log(`🚀 Starting scan for ${scheduledScan.target} (user: ${scheduledScan.user_id})`);
+        console.log(`🚀 Starting scan for ${scheduledScan.target}`);
 
-        // Create a new scan record
-        const { data: scan, error: scanError } = await supabaseClient
+        const { data: newScan, error: createError } = await supabase
           .from('scans')
           .insert({
             target: scheduledScan.target,
@@ -69,168 +58,104 @@ Deno.serve(async (req) => {
             status: 'running',
             start_time: new Date().toISOString(),
             user_id: scheduledScan.user_id,
-            host_info: null
+            host_info: null,
           })
           .select()
           .single();
 
-        if (scanError) {
-          console.error(`❌ Error creating scan for ${scheduledScan.target}:`, scanError);
-          results.push({ target: scheduledScan.target, success: false, error: scanError.message });
+        if (createError) {
+          console.error(`❌ Error creating scan for ${scheduledScan.target}:`, createError);
+          results.push({ scheduled_scan_id: scheduledScan.id, success: false, error: createError.message });
           continue;
         }
 
-        console.log(`✅ Scan created: ${scan.scan_id} for ${scheduledScan.target}`);
+        console.log(`✅ Created scan ${newScan.scan_id} for ${scheduledScan.target}`);
 
-        // Update the scheduled scan's last_run_at and next_run_at
-        const now = new Date();
-        const nextRun = calculateNextRun(now, scheduledScan.frequency);
+        const backendUrl = 'http://localhost:8000/api/scan';
+        const scanResponse = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip_address: scheduledScan.target,
+            nmap_args: '',
+            scan_profile: scheduledScan.profile,
+          }),
+        });
 
-        const { error: updateError } = await supabaseClient
+        if (!scanResponse.ok) {
+          throw new Error(`Backend scan failed: ${scanResponse.statusText}`);
+        }
+
+        const scanData = await scanResponse.json();
+
+        await supabase
+          .from('scans')
+          .update({
+            status: 'completed',
+            end_time: new Date().toISOString(),
+            nmap_cmd: scanData.nmap_cmd,
+            nmap_output: scanData.nmap_output,
+            host_info: scanData.host_info || null,
+          })
+          .eq('scan_id', newScan.scan_id);
+
+        if (scanData.results && scanData.results.length > 0) {
+          const findingsToInsert = scanData.results.map((result: any) => ({
+            scan_id: newScan.scan_id,
+            host: result.host,
+            port: result.port,
+            state: result.state,
+            service_name: result.service,
+            service_version: result.version || 'unknown',
+            cve_id: null,
+            confidence: result.confidence || 0,
+            raw_banner: result.raw_banner || null,
+            headers: result.headers || null,
+            tls_info: result.tls_info || null,
+            proxy_detection: result.proxy_detection || null,
+            detection_methods: result.detection_methods || null,
+          }));
+
+          await supabase.from('findings').insert(findingsToInsert);
+        }
+
+        const currentRunTime = new Date();
+        const { data: nextRunData } = await supabase.rpc('calculate_next_run', {
+          current_run: currentRunTime.toISOString(),
+          freq: scheduledScan.frequency,
+        });
+
+        await supabase
           .from('scheduled_scans')
           .update({
-            last_run_at: now.toISOString(),
-            next_run_at: nextRun.toISOString()
+            last_run_at: currentRunTime.toISOString(),
+            next_run_at: nextRunData,
           })
           .eq('id', scheduledScan.id);
 
-        if (updateError) {
-          console.error(`❌ Error updating scheduled scan ${scheduledScan.id}:`, updateError);
-        }
-
-        // Trigger the actual scan by calling the backend API
-        // Note: This requires the FastAPI backend to be running
-        try {
-          const scanResponse = await fetch('http://localhost:8000/api/scan', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ip_address: scheduledScan.target,
-              nmap_args: getProfileArgs(scheduledScan.profile, scheduledScan.scan_depth),
-              scan_profile: scheduledScan.profile,
-              follow_up: false
-            })
-          });
-
-          if (!scanResponse.ok) {
-            throw new Error(`Backend scan failed: ${scanResponse.statusText}`);
-          }
-
-          const scanData = await scanResponse.json();
-
-          // Update scan with results
-          await supabaseClient
-            .from('scans')
-            .update({
-              status: 'completed',
-              end_time: new Date().toISOString(),
-              nmap_cmd: scanData.nmap_cmd || null,
-              nmap_output: scanData.nmap_output || null,
-              host_info: scanData.host_info || null
-            })
-            .eq('scan_id', scan.scan_id);
-
-          // Store findings if any
-          if (scanData.results && scanData.results.length > 0) {
-            const findings = scanData.results.map((result: any) => ({
-              scan_id: scan.scan_id,
-              host: result.host,
-              port: result.port,
-              state: result.state,
-              service_name: result.service,
-              service_version: result.version || 'unknown',
-              cve_id: null,
-              confidence: result.confidence || 0,
-              raw_banner: result.raw_banner || null,
-              headers: result.headers || null,
-              tls_info: result.tls_info || null,
-              proxy_detection: result.proxy_detection || null,
-              detection_methods: result.detection_methods || null,
-            }));
-
-            await supabaseClient
-              .from('findings')
-              .insert(findings);
-          }
-
-          results.push({ target: scheduledScan.target, success: true, scan_id: scan.scan_id });
-          console.log(`🎉 Scan completed successfully for ${scheduledScan.target}`);
-        } catch (backendError) {
-          console.error(`❌ Backend scan error for ${scheduledScan.target}:`, backendError);
-          
-          // Update scan status to failed
-          await supabaseClient
-            .from('scans')
-            .update({
-              status: 'failed',
-              end_time: new Date().toISOString()
-            })
-            .eq('scan_id', scan.scan_id);
-
-          results.push({ target: scheduledScan.target, success: false, error: (backendError as Error).message });
-        }
+        console.log(`✅ Completed scheduled scan for ${scheduledScan.target}`);
+        results.push({ scheduled_scan_id: scheduledScan.id, scan_id: newScan.scan_id, success: true });
       } catch (error) {
-        console.error(`❌ Error processing scheduled scan for ${scheduledScan.target}:`, error);
-        results.push({ target: scheduledScan.target, success: false, error: (error as Error).message });
+        console.error(`❌ Error processing scan for ${scheduledScan.target}:`, error);
+        results.push({
+          scheduled_scan_id: scheduledScan.id,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     }
 
-    console.log(`✅ Processed ${results.length} scheduled scans`);
+    console.log(`🎉 Processed ${results.length} scheduled scans`);
+
     return new Response(
-      JSON.stringify({ 
-        message: 'Scheduled scans processed', 
-        processed: results.length,
-        results 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ message: 'Scheduled scans processed', processedCount: results.length, results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error) {
     console.error('❌ Error in run-scheduled-scans:', error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
-
-function calculateNextRun(currentDate: Date, frequency: string): Date {
-  const next = new Date(currentDate);
-  
-  switch (frequency) {
-    case 'daily':
-      next.setDate(next.getDate() + 1);
-      break;
-    case 'weekly':
-      next.setDate(next.getDate() + 7);
-      break;
-    case 'monthly':
-      next.setMonth(next.getMonth() + 1);
-      break;
-    default:
-      next.setDate(next.getDate() + 1);
-  }
-  
-  return next;
-}
-
-function getProfileArgs(profile: string, depth: string): string {
-  const baseArgs: Record<string, string> = {
-    'web-apps': '-p 80,443,8080,8443,3000,5000,8000,9000',
-    'databases': '-p 1433,1521,3306,5432,6379,9042,11211,27017',
-    'remote-access': '-p 22,23,3389,5900',
-    'comprehensive': '-p-'
-  };
-
-  const depthArgs: Record<string, string> = {
-    'fast': '-T4',
-    'deep': '-T3 -sV',
-    'aggressive': '-T4 -A -sV --script=default'
-  };
-
-  return `${baseArgs[profile] || baseArgs['comprehensive']} ${depthArgs[depth] || depthArgs['fast']}`;
-}

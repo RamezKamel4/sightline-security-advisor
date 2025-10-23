@@ -25,11 +25,25 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // Check if this is a scheduled scan
   if (scanData.schedule !== 'now') {
-    console.log('📅 Creating scheduled scan for:', scanData.schedule);
+    console.log(`📅 Creating scheduled scan (${scanData.schedule})`);
     
-    // Calculate the next run time based on current time and frequency
+    // Calculate first run time based on current time
     const now = new Date();
-    const scheduledTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    const scheduledTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+    
+    // Calculate next_run_at based on frequency
+    let nextRunAt = new Date(now);
+    switch (scanData.schedule) {
+      case 'daily':
+        nextRunAt.setDate(nextRunAt.getDate() + 1);
+        break;
+      case 'weekly':
+        nextRunAt.setDate(nextRunAt.getDate() + 7);
+        break;
+      case 'monthly':
+        nextRunAt.setMonth(nextRunAt.getMonth() + 1);
+        break;
+    }
     
     const { data: scheduledScan, error: scheduleError } = await supabase
       .from('scheduled_scans')
@@ -40,22 +54,22 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         scan_depth: scanData.scanDepth,
         frequency: scanData.schedule,
         scheduled_time: scheduledTime,
-        next_run_at: now.toISOString(),
-        is_active: true
+        next_run_at: nextRunAt.toISOString(),
+        is_active: true,
       })
       .select()
       .single();
-
+    
     if (scheduleError) {
       console.error('❌ Error creating scheduled scan:', scheduleError);
-      throw new Error(`Failed to create scheduled scan: ${scheduleError.message}`);
+      throw new Error(`Failed to schedule scan: ${scheduleError.message}`);
     }
-
+    
     console.log('✅ Scheduled scan created:', scheduledScan.id);
     return scheduledScan.id;
   }
 
-  // For immediate scans, proceed as before
+  // For "now" scans, create and execute immediately
   console.log('💾 Creating scan record in database...');
   const { data: scan, error } = await supabase
     .from('scans')
@@ -78,7 +92,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   console.log('✅ Scan created in database with ID:', scan.scan_id);
 
-    // Start the actual scan
+  // Start the actual scan
   try {
     const scanResponse = await executeScan(
       scanData.target, 
