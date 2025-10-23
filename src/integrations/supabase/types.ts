@@ -184,6 +184,51 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_scans: {
+        Row: {
+          created_at: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          next_run_at: string
+          profile: string
+          scan_depth: string
+          scheduled_time: string
+          target: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          next_run_at: string
+          profile: string
+          scan_depth?: string
+          scheduled_time: string
+          target: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          next_run_at?: string
+          profile?: string
+          scan_depth?: string
+          scheduled_time?: string
+          target?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -234,6 +279,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_next_run: {
+        Args: { current_run: string; freq: string }
+        Returns: string
+      }
+      get_due_scheduled_scans: {
+        Args: never
+        Returns: {
+          frequency: string
+          id: string
+          profile: string
+          scan_depth: string
+          scheduled_time: string
+          target: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
