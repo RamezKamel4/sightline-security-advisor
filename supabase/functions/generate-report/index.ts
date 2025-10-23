@@ -134,10 +134,12 @@ TARGET: ${scan.target}
 SCAN FINDINGS:
 ${findingsSummary}
 
+CRITICAL INSTRUCTION: If a CVE ID and CVSS Score are provided in the findings above, you MUST include them in the report. Do NOT mark them as "N/A" or "Configuration Issue" if actual CVE data is available. Use the EXACT CVE ID and CVSS Score provided.
+
 Generate a client-ready security report with the following structure:
 
 ## 1. EXECUTIVE SUMMARY (One Page)
-- Overall risk level: Critical/High/Medium/Low
+- Overall risk level: Critical/High/Medium/Low (use CVSS scores to determine: 9.0-10.0 = Critical, 7.0-8.9 = High, 4.0-6.9 = Medium, 0.1-3.9 = Low)
 - Top 2-3 most urgent vulnerabilities explained in plain, non-technical language
 - Clear recommendations split into:
   * IMMEDIATE ACTIONS: Quick mitigation steps to reduce risk now
@@ -146,7 +148,7 @@ Generate a client-ready security report with the following structure:
 ## 2. VULNERABILITY DETAILS (For Each Finding)
 For each vulnerability, provide:
 - **Port/Service/Version**: What was found
-- **CVE ID & CVSS Score**: Severity rating
+- **CVE ID & CVSS Score**: If provided in findings above, use the EXACT CVE ID and CVSS Score. Only use "N/A" if no CVE data is available.
 - **Business Impact Explanation**: Describe in simple terms what hackers could do (e.g., "Hackers can steal customer data" or "Systems could be taken offline")
 - **IMMEDIATE FIX**: Short-term mitigation step to reduce risk quickly
 - **PERMANENT FIX**: Proper patch, upgrade, or configuration change with version numbers
