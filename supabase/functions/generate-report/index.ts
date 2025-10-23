@@ -111,22 +111,43 @@ serve(async (req) => {
       }
     }
 
-    // Prepare detailed findings summary with CVE information
-    const findingsSummary = findings && findings.length > 0 
+    // Prepare detailed findings with full CVE information
+    const findingsWithCVE = findings && findings.length > 0 
       ? findings.map(finding => {
           const cve = cveDetails.find(c => c.cve_id === finding.cve_id);
-          let summary = `Port ${finding.port}: ${finding.service_name} ${finding.service_version || ''}`;
+          return {
+            port: finding.port,
+            service: finding.service_name,
+            version: finding.service_version || 'unknown',
+            cve_id: cve?.cve_id || null,
+            cvss_score: cve?.cvss_score || null,
+            cve_description: cve?.description || null
+          };
+        })
+      : [];
+
+    // Create a structured summary for the prompt
+    const findingsSummary = findingsWithCVE.length > 0
+      ? findingsWithCVE.map((f, index) => {
+          let summary = `Finding ${index + 1}:\n`;
+          summary += `  Port: ${f.port}\n`;
+          summary += `  Service: ${f.service}\n`;
+          summary += `  Version: ${f.version}\n`;
           
-          if (cve) {
-            summary += `\n  CVE: ${cve.cve_id} (CVSS Score: ${cve.cvss_score || 'N/A'})`;
-            summary += `\n  Description: ${cve.description.substring(0, 200)}...`;
+          if (f.cve_id && f.cvss_score) {
+            summary += `  CVE ID: ${f.cve_id}\n`;
+            summary += `  CVSS Score: ${f.cvss_score}\n`;
+            summary += `  Technical Description: ${f.cve_description}\n`;
+          } else {
+            summary += `  CVE ID: No CVE found\n`;
+            summary += `  CVSS Score: N/A\n`;
           }
           
           return summary;
-        }).join('\n\n')
+        }).join('\n')
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
-    // Generate AI report using Gemini
+    // Generate AI report using Gemini with explicit instructions
     const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
 
 TARGET: ${scan.target}
@@ -134,7 +155,15 @@ TARGET: ${scan.target}
 SCAN FINDINGS:
 ${findingsSummary}
 
-CRITICAL INSTRUCTION: If a CVE ID and CVSS Score are provided in the findings above, you MUST include them in the report. Do NOT mark them as "N/A" or "Configuration Issue" if actual CVE data is available. Use the EXACT CVE ID and CVSS Score provided.
+CRITICAL INSTRUCTIONS:
+1. For EACH finding above, you MUST generate a complete vulnerability entry in the report
+2. If a CVE ID and CVSS Score are provided, use them EXACTLY as shown - do NOT write "N/A" or "Configuration Issue"
+3. If NO CVE is found for a finding, then you may write "N/A" for CVE ID and provide a risk assessment based on the service/version
+4. For EVERY vulnerability (with or without CVE), you MUST provide:
+   - A clear business impact explanation in plain language
+   - Immediate mitigation steps
+   - Permanent fix recommendations with specific version numbers when available
+   - Compliance mapping to relevant standards
 
 Generate a client-ready security report with the following structure:
 
@@ -146,13 +175,16 @@ Generate a client-ready security report with the following structure:
   * PERMANENT FIXES: Long-term patches or upgrades needed
 
 ## 2. VULNERABILITY DETAILS (For Each Finding)
-For each vulnerability, provide:
-- **Port/Service/Version**: What was found
-- **CVE ID & CVSS Score**: If provided in findings above, use the EXACT CVE ID and CVSS Score. Only use "N/A" if no CVE data is available.
-- **Business Impact Explanation**: Describe in simple terms what hackers could do (e.g., "Hackers can steal customer data" or "Systems could be taken offline")
-- **IMMEDIATE FIX**: Short-term mitigation step to reduce risk quickly
-- **PERMANENT FIX**: Proper patch, upgrade, or configuration change with version numbers
-- **Compliance Mapping**: Which standards are violated (e.g., PCI DSS Req. 6.2, ISO-27001 A.12.6.1, NIST CSF PR.IP-12)
+You MUST create an entry for EVERY finding listed above. For each vulnerability, provide:
+
+- **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
+- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If not provided, write "N/A (No CVE match found)"]
+- **Business Impact Explanation**: Write 2-3 sentences in plain, non-technical language explaining what an attacker could do and why this matters to the business. Focus on real-world consequences like data theft, service disruption, or financial loss.
+- **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
+- **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
+- **Compliance Mapping**: List relevant standards violated (e.g., PCI DSS Req. 6.2, ISO-27001 A.12.6.1, NIST CSF PR.IP-12)
+
+IMPORTANT: Even if a finding has no CVE match, you MUST still provide business impact analysis, fixes, and compliance mapping based on the service and version information.
 
 ## 3. RISK PRIORITIZATION
 Group all findings by severity:
