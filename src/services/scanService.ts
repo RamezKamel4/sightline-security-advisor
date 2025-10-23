@@ -23,7 +23,39 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   console.log('✅ User authenticated:', user.id);
 
-  // Create scan record in database - the scan_id will be auto-generated with the new format
+  // Check if this is a scheduled scan
+  if (scanData.schedule !== 'now') {
+    console.log('📅 Creating scheduled scan for:', scanData.schedule);
+    
+    // Calculate the next run time based on current time and frequency
+    const now = new Date();
+    const scheduledTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+    
+    const { data: scheduledScan, error: scheduleError } = await supabase
+      .from('scheduled_scans')
+      .insert({
+        user_id: user.id,
+        target: scanData.target,
+        profile: scanData.scanProfile,
+        scan_depth: scanData.scanDepth,
+        frequency: scanData.schedule,
+        scheduled_time: scheduledTime,
+        next_run_at: now.toISOString(),
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (scheduleError) {
+      console.error('❌ Error creating scheduled scan:', scheduleError);
+      throw new Error(`Failed to create scheduled scan: ${scheduleError.message}`);
+    }
+
+    console.log('✅ Scheduled scan created:', scheduledScan.id);
+    return scheduledScan.id;
+  }
+
+  // For immediate scans, proceed as before
   console.log('💾 Creating scan record in database...');
   const { data: scan, error } = await supabase
     .from('scans')
