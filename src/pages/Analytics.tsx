@@ -35,10 +35,20 @@ const Analytics = () => {
         return date.toISOString().split('T')[0];
       }).reverse();
 
-      const scansByDay = last7Days.map(day => ({
-        date: new Date(day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        scans: data.filter(s => s.start_time?.startsWith(day)).length,
-      }));
+      const scansByDay = last7Days.map(day => {
+        const dayStart = new Date(day);
+        const dayEnd = new Date(day);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        
+        return {
+          date: dayStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          scans: data.filter(s => {
+            if (!s.start_time) return false;
+            const scanDate = new Date(s.start_time);
+            return scanDate >= dayStart && scanDate < dayEnd;
+          }).length,
+        };
+      });
 
       return {
         total,
