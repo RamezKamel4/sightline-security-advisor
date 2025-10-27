@@ -28,20 +28,44 @@ const Auth = () => {
     }
   }, [user, authLoading, signOut]);
 
-  // Detect password recovery from email link
+  // Detect password recovery from email link and wait for session
   React.useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
+    const checkRecoverySession = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      
+      if (type === 'recovery') {
+        // Wait for auth context to establish session from the recovery token
+        // The session state will be updated by AuthContext's onAuthStateChange listener
+        setIsUpdatePasswordMode(true);
+        setIsResetMode(false);
+        setIsLogin(false);
+      }
+    };
     
-    if (type === 'recovery') {
-      // Show password update form - the AuthContext will handle session validation
-      setIsUpdatePasswordMode(true);
-      setIsResetMode(false);
-      setIsLogin(false);
-      // Clear the hash to prevent reprocessing
-      window.history.replaceState(null, '', window.location.pathname);
-    }
+    checkRecoverySession();
   }, []);
+
+  // Monitor session state when in update password mode
+  React.useEffect(() => {
+    if (isUpdatePasswordMode && !authLoading) {
+      // Clear the hash after session is established
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      
+      // If no session after loading completes, show error
+      if (!user) {
+        toast({
+          title: "Session Error",
+          description: "Unable to establish password reset session. Please request a new reset link.",
+          variant: "destructive",
+        });
+        setIsUpdatePasswordMode(false);
+        setIsLogin(true);
+      }
+    }
+  }, [isUpdatePasswordMode, authLoading, user, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +73,19 @@ const Auth = () => {
 
     try {
       if (isUpdatePasswordMode) {
+        // Verify session exists before attempting password update
+        if (!user) {
+          toast({
+            title: "Auth Session Missing",
+            description: "Your session has expired. Please request a new password reset link.",
+            variant: "destructive",
+          });
+          setIsUpdatePasswordMode(false);
+          setIsLogin(true);
+          setLoading(false);
+          return;
+        }
+
         // Validate passwords match
         if (password !== confirmPassword) {
           toast({
