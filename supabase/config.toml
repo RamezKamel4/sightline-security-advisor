@@ -1,7 +1,7 @@
 project_id = "bliwnrikjfzcialoznur"
 
 [functions.generate-report]
-verify_jwt = true
+verify_jwt = false
 
 [functions.gemini-chat]
 verify_jwt = true
