@@ -17,9 +17,49 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waitingForSession, setWaitingForSession] = useState(false);
   const { signIn, signUp, resetPassword, updatePassword, user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Detect password recovery from email link
+  React.useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery') {
+      setWaitingForSession(true);
+      setIsUpdatePasswordMode(true);
+      setIsResetMode(false);
+      setIsLogin(false);
+    }
+  }, []);
+
+  // Wait for session to establish during recovery
+  React.useEffect(() => {
+    if (waitingForSession && !authLoading) {
+      if (user) {
+        // Session established successfully
+        setWaitingForSession(false);
+        // Now we can clear the hash
+        window.history.replaceState(null, '', window.location.pathname);
+      } else {
+        // Session failed to establish
+        setTimeout(() => {
+          if (!user && waitingForSession) {
+            toast({
+              title: "Session Error",
+              description: "Unable to establish password reset session. Please try clicking the reset link again.",
+              variant: "destructive",
+            });
+            setWaitingForSession(false);
+            setIsUpdatePasswordMode(false);
+            setIsLogin(true);
+          }
+        }, 2000); // Give it 2 seconds to establish
+      }
+    }
+  }, [waitingForSession, authLoading, user, toast]);
 
   // Sign out user if they navigate to auth page while authenticated
   // BUT don't sign out if this is a password recovery flow
@@ -27,49 +67,10 @@ const Auth = () => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     
-    if (!authLoading && user && type !== 'recovery') {
+    if (!authLoading && user && type !== 'recovery' && !isUpdatePasswordMode) {
       signOut();
     }
-  }, [user, authLoading, signOut]);
-
-  // Detect password recovery from email link and wait for session
-  React.useEffect(() => {
-    const checkRecoverySession = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const type = hashParams.get('type');
-      
-      if (type === 'recovery') {
-        // Wait for auth context to establish session from the recovery token
-        // The session state will be updated by AuthContext's onAuthStateChange listener
-        setIsUpdatePasswordMode(true);
-        setIsResetMode(false);
-        setIsLogin(false);
-      }
-    };
-    
-    checkRecoverySession();
-  }, []);
-
-  // Monitor session state when in update password mode
-  React.useEffect(() => {
-    if (isUpdatePasswordMode && !authLoading) {
-      // Clear the hash after session is established
-      if (window.location.hash) {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-      
-      // If no session after loading completes, show error
-      if (!user) {
-        toast({
-          title: "Session Error",
-          description: "Unable to establish password reset session. Please request a new reset link.",
-          variant: "destructive",
-        });
-        setIsUpdatePasswordMode(false);
-        setIsLogin(true);
-      }
-    }
-  }, [isUpdatePasswordMode, authLoading, user, toast]);
+  }, [user, authLoading, signOut, isUpdatePasswordMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +190,17 @@ const Auth = () => {
           </div>
         </div>
 
-        <Card>
+        {waitingForSession ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-slate-600">Establishing secure session...</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
           <CardHeader>
             <CardTitle className="text-center">
               {isUpdatePasswordMode ? 'Update Password' : (isResetMode ? 'Reset Password' : (isLogin ? 'Sign In' : 'Create Account'))}
@@ -347,6 +358,7 @@ const Auth = () => {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );
