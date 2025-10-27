@@ -184,7 +184,7 @@ For each vulnerability, format it as follows:
 ### **Vulnerability [NUMBER]**
 
 - **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
-- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, write the CVE ID (e.g., "CVE-2021-44228") followed by " - CVSS Score: X.X - View details at: ${appUrl}/cve-lookup?cveId=CVE-XXXX-XXXX" (replace with actual CVE ID). If not provided, write "N/A (No CVE match found)"]
+- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, write the CVE ID (e.g., "CVE-2021-44228") followed by " - CVSS Score: X.X - View details here: ${appUrl}/cve-lookup?cveId=CVE-XXXX-XXXX" (replace CVE-XXXX-XXXX with actual CVE ID in the URL). If not provided, write "N/A (No CVE match found)"]
 - **Business Impact Explanation**: Write 2-3 sentences in plain, non-technical language explaining what an attacker could do and why this matters to the business. Focus on real-world consequences like data theft, service disruption, or financial loss.
 - **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
 - **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
@@ -379,6 +379,7 @@ Generate the complete report now.`;
     // Split report content into lines and add to PDF
     const lines = reportContent.split('\n');
     const cveRegex = /CVE-\d{4}-\d{4,7}/g;
+    const viewDetailsRegex = /View details here: (https?:\/\/[^\s]+)/g;
     
     for (const line of lines) {
       // Check if we need a new page
@@ -401,8 +402,8 @@ Generate the complete report now.`;
         const textWidth = (isHeader ? boldFont : font).widthOfTextAtSize(testLine, fontSize);
         
         if (textWidth > maxWidth && currentLine) {
-          // Draw current line with CVE highlighting
-          drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
+          // Draw current line with CVE highlighting and links
+          drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl, pdfDoc);
           yPosition -= lineHeight;
           currentLine = word;
           
@@ -416,9 +417,9 @@ Generate the complete report now.`;
         }
       }
       
-      // Draw remaining text with CVE highlighting
+      // Draw remaining text with CVE highlighting and links
       if (currentLine) {
-        drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
+        drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl, pdfDoc);
         yPosition -= lineHeight;
       }
       
@@ -428,12 +429,13 @@ Generate the complete report now.`;
       }
     }
     
-    // Helper function to draw text with CVE IDs in blue
-    function drawLineWithCVEHighlight(page: any, text: string, x: number, y: number, size: number, textFont: any) {
+    // Helper function to draw text with CVE IDs in blue and clickable "here" links
+    function drawLineWithCVEHighlight(page: any, text: string, x: number, y: number, size: number, textFont: any, baseUrl: string, doc: any) {
       const cveMatches = Array.from(text.matchAll(cveRegex));
+      const linkMatches = Array.from(text.matchAll(viewDetailsRegex));
       
-      if (cveMatches.length === 0) {
-        // No CVE IDs, draw normally
+      if (cveMatches.length === 0 && linkMatches.length === 0) {
+        // No CVE IDs or links, draw normally
         page.drawText(text, {
           x,
           y,
@@ -447,6 +449,7 @@ Generate the complete report now.`;
       let currentX = x;
       let lastIndex = 0;
       
+      // Process CVE IDs first
       for (const match of cveMatches) {
         const cveId = match[0];
         const beforeText = text.substring(lastIndex, match.index);
@@ -476,7 +479,73 @@ Generate the complete report now.`;
         lastIndex = match.index + cveId.length;
       }
       
-      // Draw remaining text after last CVE
+      // Process "View details here" links
+      for (const match of linkMatches) {
+        const fullMatch = match[0]; // "View details here: https://..."
+        const url = match[1]; // The URL
+        const beforeLinkText = text.substring(lastIndex, match.index);
+        
+        // Draw text before link
+        if (beforeLinkText && lastIndex < match.index) {
+          page.drawText(beforeLinkText, {
+            x: currentX,
+            y,
+            size,
+            font: textFont,
+            color: rgb(0, 0, 0),
+          });
+          currentX += textFont.widthOfTextAtSize(beforeLinkText, size);
+        }
+        
+        // Draw "View details " in normal text
+        const viewDetailsText = "View details ";
+        page.drawText(viewDetailsText, {
+          x: currentX,
+          y,
+          size,
+          font: textFont,
+          color: rgb(0, 0, 0),
+        });
+        currentX += textFont.widthOfTextAtSize(viewDetailsText, size);
+        
+        // Draw "here" in blue as a link
+        const hereText = "here";
+        const hereWidth = textFont.widthOfTextAtSize(hereText, size);
+        page.drawText(hereText, {
+          x: currentX,
+          y,
+          size,
+          font: textFont,
+          color: rgb(0, 0, 1), // Blue color
+        });
+        
+        // Add clickable link annotation for "here"
+        const annotations = page.node.get('Annots') || doc.context.obj([]);
+        const linkAnnotation = doc.context.obj({
+          Type: 'Annot',
+          Subtype: 'Link',
+          Rect: [currentX, y - 2, currentX + hereWidth, y + size],
+          Border: [0, 0, 0],
+          C: [0, 0, 1],
+          A: {
+            Type: 'Action',
+            S: 'URI',
+            URI: doc.context.obj(url),
+          },
+        });
+        
+        if (Array.isArray(annotations)) {
+          annotations.push(linkAnnotation);
+          page.node.set('Annots', doc.context.obj(annotations));
+        } else {
+          page.node.set('Annots', doc.context.obj([linkAnnotation]));
+        }
+        
+        currentX += hereWidth;
+        lastIndex = match.index + fullMatch.length;
+      }
+      
+      // Draw remaining text after last match
       const remainingText = text.substring(lastIndex);
       if (remainingText) {
         page.drawText(remainingText, {
