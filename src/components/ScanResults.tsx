@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Download, AlertTriangle, CheckCircle, Monitor, Wifi, HardDrive } from 'lucide-react';
+import { FileText, Download, AlertTriangle, CheckCircle, Monitor, Wifi, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { generateReport } from '@/services/scanService';
@@ -50,7 +50,20 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const toggleRowExpansion = (findingId: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(findingId)) {
+        newSet.delete(findingId);
+      } else {
+        newSet.add(findingId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     fetchFindings();
@@ -379,9 +392,23 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                   </TableCell>
                   <TableCell className="max-w-md">
                     {finding.cve?.description ? (
-                      <span className="text-sm text-slate-600 line-clamp-2">
-                        {finding.cve.description}
-                      </span>
+                      <div className="flex gap-2 items-start">
+                        <span className={`text-sm text-slate-600 ${!expandedRows.has(finding.finding_id) ? 'line-clamp-2' : ''}`}>
+                          {finding.cve.description}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 flex-shrink-0"
+                          onClick={() => toggleRowExpansion(finding.finding_id)}
+                        >
+                          {expandedRows.has(finding.finding_id) ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-slate-400">-</span>
                     )}
