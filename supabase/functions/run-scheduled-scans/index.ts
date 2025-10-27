@@ -10,7 +10,6 @@ interface ScheduledScan {
   user_id: string;
   target: string;
   profile: string;
-  scan_depth: string;
   frequency: string;
   scheduled_time: string;
 }
@@ -54,7 +53,6 @@ Deno.serve(async (req) => {
           .insert({
             target: scheduledScan.target,
             profile: scheduledScan.profile,
-            scan_depth: scheduledScan.scan_depth,
             status: 'running',
             start_time: new Date().toISOString(),
             user_id: scheduledScan.user_id,

@@ -5,7 +5,6 @@ import { executeScan, type ScanResult } from './scanApi';
 export interface ScanRequest {
   target: string;
   scanProfile: string;
-  scanDepth: string;
   username?: string;
   password?: string;
   schedule: string;
@@ -51,7 +50,6 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         user_id: user.id,
         target: scanData.target,
         profile: scanData.scanProfile,
-        scan_depth: scanData.scanDepth,
         frequency: scanData.schedule,
         scheduled_time: scheduledTime,
         next_run_at: nextRunAt.toISOString(),
@@ -76,7 +74,6 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
     .insert({
       target: scanData.target,
       profile: scanData.scanProfile,
-      scan_depth: scanData.scanDepth,
       status: 'running',
       start_time: new Date().toISOString(),
       user_id: user.id,
@@ -96,7 +93,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
   try {
     const scanResponse = await executeScan(
       scanData.target, 
-      scanData.scanDepth as 'fast' | 'deep' | 'aggressive', 
+      'fast', // Always use fast scan
       scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
     );
     

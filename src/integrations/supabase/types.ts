@@ -144,7 +144,6 @@ export type Database = {
           nmap_cmd: string | null
           nmap_output: string | null
           profile: string | null
-          scan_depth: string | null
           scan_id: string
           scan_source: string | null
           start_time: string | null
@@ -160,7 +159,6 @@ export type Database = {
           nmap_cmd?: string | null
           nmap_output?: string | null
           profile?: string | null
-          scan_depth?: string | null
           scan_id?: string
           scan_source?: string | null
           start_time?: string | null
@@ -176,7 +174,6 @@ export type Database = {
           nmap_cmd?: string | null
           nmap_output?: string | null
           profile?: string | null
-          scan_depth?: string | null
           scan_id?: string
           scan_source?: string | null
           start_time?: string | null
@@ -196,7 +193,6 @@ export type Database = {
           last_run_at: string | null
           next_run_at: string
           profile: string
-          scan_depth: string
           scheduled_time: string
           target: string
           updated_at: string
@@ -210,7 +206,6 @@ export type Database = {
           last_run_at?: string | null
           next_run_at: string
           profile: string
-          scan_depth?: string
           scheduled_time: string
           target: string
           updated_at?: string
@@ -224,7 +219,6 @@ export type Database = {
           last_run_at?: string | null
           next_run_at?: string
           profile?: string
-          scan_depth?: string
           scheduled_time?: string
           target?: string
           updated_at?: string
@@ -292,7 +286,6 @@ export type Database = {
           frequency: string
           id: string
           profile: string
-          scan_depth: string
           scheduled_time: string
           target: string
           user_id: string

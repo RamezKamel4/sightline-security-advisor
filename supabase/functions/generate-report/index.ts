@@ -344,7 +344,6 @@ Generate the complete report now.`;
 **Scan Date:** ${scanDate}
 **Target:** ${scan.target}
 **Scan Profile:** ${scan.profile || 'Default'}
-**Scan Depth:** ${scan.scan_depth || 'Standard'}
 
 ---
 

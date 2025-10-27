@@ -38,7 +38,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
     const scanData = {
       target,
       scanProfile,
-      scanDepth: 'fast',
       schedule,
     };
 
