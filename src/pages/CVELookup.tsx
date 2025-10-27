@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Search, Sparkles } from 'lucide-react';
-import { searchByServiceName, NVDResponse } from '@/services/nvdService';
+import { searchByServiceName, searchByCveId, NVDResponse } from '@/services/nvdService';
 import { useToast } from '@/hooks/use-toast';
 import { chatWithGemini } from '@/services/geminiService';
 import {
@@ -23,10 +23,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CVELookup = () => {
+  const [searchMode, setSearchMode] = useState<'service' | 'cveId'>('service');
   const [serviceName, setServiceName] = useState('');
   const [version, setVersion] = useState('');
+  const [cveId, setCveId] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NVDResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +45,19 @@ const CVELookup = () => {
   }, [result]);
 
   const handleLookup = async () => {
-    if (!serviceName.trim()) {
+    if (searchMode === 'service' && !serviceName.trim()) {
       toast({
         title: "Input Required",
         description: "Please enter a service name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (searchMode === 'cveId' && !cveId.trim()) {
+      toast({
+        title: "Input Required",
+        description: "Please enter a CVE ID",
         variant: "destructive",
       });
       return;
@@ -56,7 +68,13 @@ const CVELookup = () => {
     setResult(null);
 
     try {
-      const data = await searchByServiceName(serviceName, version || undefined);
+      let data;
+      if (searchMode === 'service') {
+        data = await searchByServiceName(serviceName, version || undefined);
+      } else {
+        data = await searchByCveId(cveId);
+      }
+      
       setResult(data);
       toast({
         title: "Success",
@@ -134,26 +152,44 @@ Use simple words. No technical jargon. Be clear and practical.`;
           <CardHeader>
             <CardTitle className="text-2xl">Vulnerability Search</CardTitle>
             <CardDescription>
-              Search for vulnerabilities by service name and version
+              Search for vulnerabilities by service name or CVE ID
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                placeholder="Service name (e.g., OpenSSH, Apache, nginx)"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={loading}
-              />
-              <Input
-                placeholder="Version (optional, e.g., 7.2, 2.4.41)"
-                value={version}
-                onChange={(e) => setVersion(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={loading}
-              />
-            </div>
+            <Tabs value={searchMode} onValueChange={(value) => setSearchMode(value as 'service' | 'cveId')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="service">Service Name</TabsTrigger>
+                <TabsTrigger value="cveId">CVE ID</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="service" className="space-y-2 mt-4">
+                <Input
+                  placeholder="Service name (e.g., OpenSSH, Apache, nginx)"
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={loading}
+                />
+                <Input
+                  placeholder="Version (optional, e.g., 7.2, 2.4.41)"
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={loading}
+                />
+              </TabsContent>
+              
+              <TabsContent value="cveId" className="space-y-2 mt-4">
+                <Input
+                  placeholder="CVE ID (e.g., CVE-2021-44228)"
+                  value={cveId}
+                  onChange={(e) => setCveId(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={loading}
+                />
+              </TabsContent>
+            </Tabs>
+            
             <Button onClick={handleLookup} disabled={loading} className="w-full">
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

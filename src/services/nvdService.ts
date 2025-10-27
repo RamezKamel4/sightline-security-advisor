@@ -70,3 +70,46 @@ export const searchByServiceName = async (serviceName: string, version?: string)
     throw error instanceof Error ? error : new Error('An unexpected error occurred');
   }
 };
+
+export const searchByCveId = async (cveId: string): Promise<NVDResponse> => {
+  try {
+    console.log('🔍 Starting CVE ID search for:', cveId);
+    
+    // Get session for authorization
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('❌ Session error:', sessionError);
+      throw new Error('Authentication error. Please try logging out and back in.');
+    }
+    
+    if (!session?.access_token) {
+      console.error('❌ No session token found');
+      throw new Error('Not authenticated. Please log in to search vulnerabilities.');
+    }
+
+    console.log('✅ Session valid, user authenticated');
+    console.log('📡 Calling nvd-proxy edge function with CVE ID:', cveId);
+
+    // Call nvd-proxy edge function with cveId parameter
+    const { data, error } = await supabase.functions.invoke('nvd-proxy', {
+      body: { cveId: cveId.trim() }
+    });
+
+    if (error) {
+      console.error('❌ Edge function error:', error);
+      throw new Error(`Search failed: ${error.message || 'Unknown error'}`);
+    }
+
+    if (!data) {
+      console.error('❌ No data returned from edge function');
+      throw new Error('No response from vulnerability database');
+    }
+
+    console.log('✅ CVE ID search successful, found:', data.totalResults || 0, 'results');
+    return data as NVDResponse;
+  } catch (error) {
+    console.error('💥 CVE ID search error:', error);
+    throw error instanceof Error ? error : new Error('An unexpected error occurred');
+  }
+};
