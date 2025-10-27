@@ -3,15 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { enrichFindingsWithCVE } from './cveEnrichmentService';
 
 export const generateReport = async (scanId: string): Promise<void> => {
-  console.log('🚀 Starting report generation for scan:', scanId);
+  console.log('🚀 Starting AI report generation for scan:', scanId);
   
   try {
-    // Step 1: Enrich findings with CVE data from NVD
-    console.log('🔍 Enriching findings with CVE data from NVD...');
-    await enrichFindingsWithCVE(scanId);
-    console.log('✅ CVE enrichment completed');
-    
-    // Step 2: Generate AI report with enriched data
+    // CVE enrichment is now done automatically when viewing scan results
+    // So we skip straight to AI report generation
     console.log('📡 Calling generate-report edge function...');
     
     // Call the edge function to generate AI report

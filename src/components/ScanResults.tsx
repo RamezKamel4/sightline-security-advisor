@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { FileText, Download, AlertTriangle, CheckCircle, Monitor, Wifi, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { generateReport } from '@/services/scanService';
+import { generateReport } from '@/services/reportService';
+import { enrichFindingsWithCVE } from '@/services/cveEnrichmentService';
 import type { HostInfo } from '@/services/scanApi';
 
 interface ScanResultsProps {
@@ -50,6 +51,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isEnrichingCVE, setIsEnrichingCVE] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
@@ -66,10 +68,43 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   useEffect(() => {
-    fetchFindings();
-    fetchReport();
-    fetchHostInfo();
+    const initializeScanResults = async () => {
+      await fetchFindings();
+      await fetchReport();
+      await fetchHostInfo();
+      
+      // Automatically enrich findings with CVE data
+      await enrichCVEData();
+    };
+    
+    initializeScanResults();
   }, [scanId]);
+
+  const enrichCVEData = async () => {
+    setIsEnrichingCVE(true);
+    try {
+      console.log('🔍 Enriching findings with CVE data...');
+      await enrichFindingsWithCVE(scanId);
+      console.log('✅ CVE enrichment completed, refreshing findings...');
+      
+      // Refresh findings to show enriched data
+      await fetchFindings();
+      
+      toast({
+        title: "CVE Data Loaded",
+        description: "Vulnerability details have been enriched from NVD database.",
+      });
+    } catch (error) {
+      console.error('Error enriching CVE data:', error);
+      toast({
+        title: "CVE Enrichment Warning",
+        description: "Some vulnerability details could not be loaded. Report generation will continue.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsEnrichingCVE(false);
+    }
+  };
 
   const fetchFindings = async () => {
     try {
@@ -189,7 +224,26 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   if (loading) {
-    return <div className="p-4">Loading scan results...</div>;
+    return (
+      <div className="p-4">
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-slate-600">Loading scan results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEnrichingCVE) {
+    return (
+      <div className="p-4">
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-slate-600 font-medium mb-2">Enriching vulnerability data...</p>
+          <p className="text-slate-500 text-sm">Fetching CVE details from NVD database</p>
+        </div>
+      </div>
+    );
   }
 
   const risk = getRiskLevel();
