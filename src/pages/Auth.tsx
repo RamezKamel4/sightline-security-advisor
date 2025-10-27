@@ -61,16 +61,16 @@ const Auth = () => {
     }
   }, [waitingForSession, authLoading, user, toast]);
 
-  // Sign out user if they navigate to auth page while authenticated
-  // BUT don't sign out if this is a password recovery flow
+  // Redirect authenticated users to home page
+  // BUT don't redirect if this is a password recovery flow
   React.useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     
     if (!authLoading && user && type !== 'recovery' && !isUpdatePasswordMode) {
-      signOut();
+      navigate('/');
     }
-  }, [user, authLoading, signOut, isUpdatePasswordMode]);
+  }, [user, authLoading, navigate, isUpdatePasswordMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
