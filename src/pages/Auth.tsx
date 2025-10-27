@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,17 +28,38 @@ const Auth = () => {
     }
   }, [user, authLoading, signOut]);
 
-  // Detect password recovery from email link
+  // Detect password recovery from email link and validate session
   React.useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
+    const checkRecoverySession = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      
+      if (type === 'recovery' && accessToken) {
+        // Wait a moment for Supabase to establish the session
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify we have a valid session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          setIsUpdatePasswordMode(true);
+          setIsResetMode(false);
+          setIsLogin(false);
+          // Clear the hash to prevent reprocessing
+          window.history.replaceState(null, '', window.location.pathname);
+        } else {
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired. Please request a new one.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
     
-    if (type === 'recovery') {
-      setIsUpdatePasswordMode(true);
-      setIsResetMode(false);
-      setIsLogin(false);
-    }
-  }, []);
+    checkRecoverySession();
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +67,20 @@ const Auth = () => {
 
     try {
       if (isUpdatePasswordMode) {
+        // Validate we have a session first
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast({
+            title: "Session Expired",
+            description: "Your password reset session has expired. Please request a new reset link.",
+            variant: "destructive",
+          });
+          setIsUpdatePasswordMode(false);
+          setIsLogin(true);
+          setLoading(false);
+          return;
+        }
+
         // Validate passwords match
         if (password !== confirmPassword) {
           toast({
