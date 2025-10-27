@@ -39,9 +39,8 @@ serve(async (req) => {
     
     console.log('Processing report generation for scanId:', scanId);
     
-    // Get app URL for CVE links (default to Supabase URL if not set)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const appUrl = Deno.env.get('APP_URL') ?? supabaseUrl;
+    // Get app URL for CVE links (use production URL)
+    const appUrl = Deno.env.get('APP_URL') ?? 'https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com';
     
     // Get Gemini API key
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
