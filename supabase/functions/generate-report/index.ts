@@ -39,6 +39,10 @@ serve(async (req) => {
     
     console.log('Processing report generation for scanId:', scanId);
     
+    // Get app URL for CVE links (default to Supabase URL if not set)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const appUrl = Deno.env.get('APP_URL') ?? supabaseUrl;
+    
     // Get Gemini API key
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     
@@ -181,7 +185,7 @@ For each vulnerability, format it as follows:
 ### **Vulnerability [NUMBER]**
 
 - **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
-- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If not provided, write "N/A (No CVE match found)"]
+- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, format it EXACTLY as: "CVE-XXXX-XXXX (View detailed analysis: ${appUrl}/cve-lookup?cveId=CVE-XXXX-XXXX)" - replace CVE-XXXX-XXXX with the actual CVE ID in both places. If not provided, write "N/A (No CVE match found)"]
 - **Business Impact Explanation**: Write 2-3 sentences in plain, non-technical language explaining what an attacker could do and why this matters to the business. Focus on real-world consequences like data theft, service disruption, or financial loss.
 - **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
 - **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
