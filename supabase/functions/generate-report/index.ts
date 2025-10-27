@@ -150,12 +150,11 @@ serve(async (req) => {
     // Generate AI report using Gemini with explicit instructions
     const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
 
-TARGET: ${scan.target}
-
 SCAN FINDINGS:
 ${findingsSummary}
 
 CRITICAL INSTRUCTIONS:
+0. DO NOT include any preamble or introduction like "Okay, here's the client-ready security report..." - start DIRECTLY with the Executive Summary section
 1. For EACH finding above, you MUST generate a complete vulnerability entry in the report
 2. If a CVE ID and CVSS Score are provided, use them EXACTLY as shown - do NOT write "N/A" or "Configuration Issue"
 3. If NO CVE is found for a finding, then you may write "N/A" for CVE ID and provide a risk assessment based on the service/version
@@ -201,11 +200,11 @@ Provide a brief technical explanation covering:
 - Why only certain ports were scanned (explain the scan profile used, e.g., web-apps profile focusing on web-related services, deliberately excluding system-level ports like SMB or NetBIOS)
 - How environmental restrictions and deliberate scan scope affected version detection capabilities
 
-## 5. TECHNICAL APPENDIX
-Include raw technical details:
+## 5. TECHNICAL SUMMARY
+Include technical details:
 - Open ports discovered
 - Service banners and versions detected
-- Raw tool outputs (keep this separate from executive summary)
+DO NOT include any "Raw Tool Outputs" section
 
 ## STYLE REQUIREMENTS:
 - Write in professional, client-ready language
@@ -318,8 +317,40 @@ Generate the complete report now.`;
       });
     }
     
-    const reportContent = aiData.candidates[0].content.parts[0].text;
+    let reportContent = aiData.candidates[0].content.parts[0].text;
     console.log('AI report generated successfully, length:', reportContent.length);
+    
+    // Remove any preamble text that starts with common phrases
+    const preamblePatterns = [
+      /^Okay,\s+here'?s?\s+the\s+client-ready\s+security\s+report[^\n]*\n+/i,
+      /^Here'?s?\s+the\s+client-ready\s+security\s+report[^\n]*\n+/i,
+      /^Here'?s?\s+a\s+client-ready\s+security\s+report[^\n]*\n+/i,
+    ];
+    
+    for (const pattern of preamblePatterns) {
+      reportContent = reportContent.replace(pattern, '');
+    }
+    
+    // Format scan date
+    const scanDate = new Date(scan.start_time || scan.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Prepend scan metadata to report
+    const metadata = `# Security Scan Report
+
+**Scan Date:** ${scanDate}
+**Target:** ${scan.target}
+**Scan Profile:** ${scan.profile || 'Default'}
+**Scan Depth:** ${scan.scan_depth || 'Standard'}
+
+---
+
+`;
+    
+    reportContent = metadata + reportContent;
 
     // Generate PDF
     console.log('Generating PDF...');
@@ -334,25 +365,8 @@ Generate the complete report now.`;
     let { width, height } = currentPage.getSize();
     let yPosition = height - margin;
     
-    // Add title
-    currentPage.drawText('Security Scan Report', {
-      x: margin,
-      y: yPosition,
-      size: 20,
-      font: boldFont,
-      color: rgb(0, 0, 0),
-    });
-    yPosition -= 40;
-    
-    // Add scan details
-    currentPage.drawText(`Target: ${scan.target}`, {
-      x: margin,
-      y: yPosition,
-      size: fontSize,
-      font: font,
-      color: rgb(0.2, 0.2, 0.2),
-    });
-    yPosition -= lineHeight * 2;
+    // PDF header is now part of the report content, so we skip adding a separate title
+    // Just start with the report content directly
     
     // Split report content into lines and add to PDF
     const lines = reportContent.split('\n');
