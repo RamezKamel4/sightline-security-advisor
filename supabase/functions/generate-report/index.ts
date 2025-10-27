@@ -244,7 +244,7 @@ Generate the complete report now.`;
             }],
             generationConfig: {
               temperature: 0.3,
-              maxOutputTokens: 4096,
+              maxOutputTokens: 16384,
             }
           }),
         });
