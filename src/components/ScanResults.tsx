@@ -81,19 +81,30 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   }, [scanId]);
 
   const enrichCVEData = async () => {
-    setIsEnrichingCVE(true);
     try {
-      console.log('🔍 Enriching findings with CVE data...');
+      setIsEnrichingCVE(true);
+      console.log('🔍 Checking if CVE enrichment is needed...');
+      
+      // enrichFindingsWithCVE will check if already enriched and skip if so
       await enrichFindingsWithCVE(scanId);
-      console.log('✅ CVE enrichment completed, refreshing findings...');
+      console.log('✅ CVE enrichment process completed, refreshing findings...');
       
       // Refresh findings to show enriched data
       await fetchFindings();
       
-      toast({
-        title: "CVE Data Loaded",
-        description: "Vulnerability details have been enriched from NVD database.",
-      });
+      // Only show success toast if enrichment actually ran
+      const { data: scanData } = await supabase
+        .from('scans')
+        .select('cve_enriched')
+        .eq('scan_id', scanId)
+        .single();
+      
+      if (scanData?.cve_enriched) {
+        toast({
+          title: "CVE Data Loaded",
+          description: "Vulnerability details have been loaded from database.",
+        });
+      }
     } catch (error) {
       console.error('Error enriching CVE data:', error);
       toast({

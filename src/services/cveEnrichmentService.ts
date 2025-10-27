@@ -10,6 +10,23 @@ interface CVEDetail {
 export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
   console.log('🔍 Starting CVE enrichment for scan:', scanId);
   
+  // Check if this scan has already been enriched
+  const { data: scanData, error: scanCheckError } = await supabase
+    .from('scans')
+    .select('cve_enriched')
+    .eq('scan_id', scanId)
+    .single();
+
+  if (scanCheckError) {
+    console.error('❌ Error checking scan enrichment status:', scanCheckError);
+    throw new Error(`Failed to check scan status: ${scanCheckError.message}`);
+  }
+
+  if (scanData?.cve_enriched) {
+    console.log('✅ Scan already enriched, skipping CVE lookup');
+    return;
+  }
+  
   // Get all findings for this scan
   const { data: findings, error: findingsError } = await supabase
     .from('findings')
@@ -121,5 +138,16 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
     }
   }
 
-  console.log('✅ CVE enrichment completed');
+  // Mark scan as enriched
+  const { error: updateError } = await supabase
+    .from('scans')
+    .update({ cve_enriched: true })
+    .eq('scan_id', scanId);
+
+  if (updateError) {
+    console.error('❌ Error marking scan as enriched:', updateError);
+    // Don't throw - enrichment was successful even if we couldn't update the flag
+  }
+
+  console.log('✅ CVE enrichment completed and marked in database');
 };

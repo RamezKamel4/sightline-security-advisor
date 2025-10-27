@@ -138,6 +138,7 @@ export type Database = {
       }
       scans: {
         Row: {
+          cve_enriched: boolean
           end_time: string | null
           host_info: Json | null
           nmap_cmd: string | null
@@ -153,6 +154,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cve_enriched?: boolean
           end_time?: string | null
           host_info?: Json | null
           nmap_cmd?: string | null
@@ -168,6 +170,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cve_enriched?: boolean
           end_time?: string | null
           host_info?: Json | null
           nmap_cmd?: string | null
