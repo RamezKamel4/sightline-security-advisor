@@ -185,7 +185,7 @@ For each vulnerability, format it as follows:
 ### **Vulnerability [NUMBER]**
 
 - **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
-- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, write just the CVE ID (e.g., "CVE-2021-44228") followed by the CVSS score. If not provided, write "N/A (No CVE match found)"]
+- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, write the CVE ID (e.g., "CVE-2021-44228") followed by " - CVSS Score: X.X - View details at: ${appUrl}/cve-lookup?cveId=CVE-XXXX-XXXX" (replace with actual CVE ID). If not provided, write "N/A (No CVE match found)"]
 - **Business Impact Explanation**: Write 2-3 sentences in plain, non-technical language explaining what an attacker could do and why this matters to the business. Focus on real-world consequences like data theft, service disruption, or financial loss.
 - **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
 - **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
@@ -402,8 +402,8 @@ Generate the complete report now.`;
         const textWidth = (isHeader ? boldFont : font).widthOfTextAtSize(testLine, fontSize);
         
         if (textWidth > maxWidth && currentLine) {
-          // Draw current line with CVE links
-          drawLineWithCVELinks(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl);
+          // Draw current line with CVE highlighting
+          drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
           yPosition -= lineHeight;
           currentLine = word;
           
@@ -417,9 +417,9 @@ Generate the complete report now.`;
         }
       }
       
-      // Draw remaining text with CVE links
+      // Draw remaining text with CVE highlighting
       if (currentLine) {
-        drawLineWithCVELinks(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl);
+        drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
         yPosition -= lineHeight;
       }
       
@@ -429,8 +429,8 @@ Generate the complete report now.`;
       }
     }
     
-    // Helper function to draw text with clickable CVE links
-    function drawLineWithCVELinks(page: any, text: string, x: number, y: number, size: number, textFont: any, baseUrl: string) {
+    // Helper function to draw text with CVE IDs in blue
+    function drawLineWithCVEHighlight(page: any, text: string, x: number, y: number, size: number, textFont: any) {
       const cveMatches = Array.from(text.matchAll(cveRegex));
       
       if (cveMatches.length === 0) {
@@ -464,8 +464,7 @@ Generate the complete report now.`;
           currentX += textFont.widthOfTextAtSize(beforeText, size);
         }
         
-        // Draw CVE ID in blue with link
-        const cveWidth = textFont.widthOfTextAtSize(cveId, size);
+        // Draw CVE ID in blue
         page.drawText(cveId, {
           x: currentX,
           y,
@@ -474,23 +473,7 @@ Generate the complete report now.`;
           color: rgb(0, 0, 1), // Blue color
         });
         
-        // Add clickable link annotation
-        const cveUrl = `${baseUrl}/cve-lookup?cveId=${cveId}`;
-        page.node.set(
-          pdfDoc.context.obj({
-            Type: 'Annot',
-            Subtype: 'Link',
-            Rect: [currentX, y - 2, currentX + cveWidth, y + size],
-            Border: [0, 0, 0],
-            A: {
-              Type: 'Action',
-              S: 'URI',
-              URI: pdfDoc.context.obj(cveUrl),
-            },
-          })
-        );
-        
-        currentX += cveWidth;
+        currentX += textFont.widthOfTextAtSize(cveId, size);
         lastIndex = match.index + cveId.length;
       }
       
