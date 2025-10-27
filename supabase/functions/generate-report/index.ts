@@ -174,7 +174,11 @@ Generate a client-ready security report with the following structure:
   * PERMANENT FIXES: Long-term patches or upgrades needed
 
 ## 2. VULNERABILITY DETAILS (For Each Finding)
-You MUST create an entry for EVERY finding listed above. For each vulnerability, provide:
+You MUST create an entry for EVERY finding listed above. 
+
+For each vulnerability, format it as follows:
+
+### **Vulnerability [NUMBER]**
 
 - **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
 - **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If not provided, write "N/A (No CVE match found)"]
@@ -182,6 +186,8 @@ You MUST create an entry for EVERY finding listed above. For each vulnerability,
 - **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
 - **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
 - **Compliance Mapping**: List relevant standards violated (e.g., PCI DSS Req. 6.2, ISO-27001 A.12.6.1, NIST CSF PR.IP-12)
+
+Add a blank line between each vulnerability for readability.
 
 IMPORTANT: Even if a finding has no CVE match, you MUST still provide business impact analysis, fixes, and compliance mapping based on the service and version information.
 
