@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CVELookup = () => {
+  const [searchParams] = useSearchParams();
   const [searchMode, setSearchMode] = useState<'service' | 'cveId'>('service');
   const [serviceName, setServiceName] = useState('');
   const [version, setVersion] = useState('');
@@ -39,10 +41,50 @@ const CVELookup = () => {
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const { toast } = useToast();
 
+  // Check for CVE ID in URL query parameters on mount
+  useEffect(() => {
+    const cveIdParam = searchParams.get('cveId');
+    if (cveIdParam) {
+      setSearchMode('cveId');
+      setCveId(cveIdParam);
+      // Trigger search automatically after a short delay
+      setTimeout(() => {
+        handleLookupWithCveId(cveIdParam);
+      }, 100);
+    }
+  }, []);
+
   // Reset to page 1 when results change
   useEffect(() => {
     setCurrentPage(1);
   }, [result]);
+
+  const handleLookupWithCveId = async (cveIdToSearch: string) => {
+    if (!cveIdToSearch.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const data = await searchByCveId(cveIdToSearch);
+      setResult(data);
+      toast({
+        title: "Success",
+        description: `Found ${data.totalResults || 0} vulnerabilities`,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLookup = async () => {
     if (searchMode === 'service' && !serviceName.trim()) {
