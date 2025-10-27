@@ -185,7 +185,7 @@ For each vulnerability, format it as follows:
 ### **Vulnerability [NUMBER]**
 
 - **Port/Service/Version**: [Port number] / [Service name] / [Version or "unknown"]
-- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, format it EXACTLY as: "CVE-XXXX-XXXX (View detailed analysis: ${appUrl}/cve-lookup?cveId=CVE-XXXX-XXXX)" - replace CVE-XXXX-XXXX with the actual CVE ID in both places. If not provided, write "N/A (No CVE match found)"]
+- **CVE ID & CVSS Score**: [Use EXACT CVE ID and Score if provided above. If CVE ID exists, write just the CVE ID (e.g., "CVE-2021-44228") followed by the CVSS score. If not provided, write "N/A (No CVE match found)"]
 - **Business Impact Explanation**: Write 2-3 sentences in plain, non-technical language explaining what an attacker could do and why this matters to the business. Focus on real-world consequences like data theft, service disruption, or financial loss.
 - **IMMEDIATE FIX**: Provide 1-2 actionable steps that can be taken RIGHT NOW to reduce risk (e.g., "Block external access to port X", "Enable firewall rules", "Restrict access to known IPs")
 - **PERMANENT FIX**: Provide specific patch/upgrade instructions with exact version numbers when available (e.g., "Update Apache from 2.4.49 to 2.4.51 or later"). If no specific version is known, provide general hardening advice.
@@ -379,6 +379,8 @@ Generate the complete report now.`;
     
     // Split report content into lines and add to PDF
     const lines = reportContent.split('\n');
+    const cveRegex = /CVE-\d{4}-\d{4,7}/g;
+    
     for (const line of lines) {
       // Check if we need a new page
       if (yPosition < margin + lineHeight) {
@@ -400,14 +402,8 @@ Generate the complete report now.`;
         const textWidth = (isHeader ? boldFont : font).widthOfTextAtSize(testLine, fontSize);
         
         if (textWidth > maxWidth && currentLine) {
-          // Draw current line
-          currentPage.drawText(currentLine, {
-            x: margin,
-            y: yPosition,
-            size: fontSize,
-            font: isHeader ? boldFont : font,
-            color: rgb(0, 0, 0),
-          });
+          // Draw current line with CVE links
+          drawLineWithCVELinks(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl);
           yPosition -= lineHeight;
           currentLine = word;
           
@@ -421,21 +417,93 @@ Generate the complete report now.`;
         }
       }
       
-      // Draw remaining text
+      // Draw remaining text with CVE links
       if (currentLine) {
-        currentPage.drawText(currentLine, {
-          x: margin,
-          y: yPosition,
-          size: fontSize,
-          font: isHeader ? boldFont : font,
-          color: rgb(0, 0, 0),
-        });
+        drawLineWithCVELinks(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl);
         yPosition -= lineHeight;
       }
       
       // Add extra spacing after headers
       if (isHeader) {
         yPosition -= lineHeight * 0.5;
+      }
+    }
+    
+    // Helper function to draw text with clickable CVE links
+    function drawLineWithCVELinks(page: any, text: string, x: number, y: number, size: number, textFont: any, baseUrl: string) {
+      const cveMatches = Array.from(text.matchAll(cveRegex));
+      
+      if (cveMatches.length === 0) {
+        // No CVE IDs, draw normally
+        page.drawText(text, {
+          x,
+          y,
+          size,
+          font: textFont,
+          color: rgb(0, 0, 0),
+        });
+        return;
+      }
+      
+      let currentX = x;
+      let lastIndex = 0;
+      
+      for (const match of cveMatches) {
+        const cveId = match[0];
+        const beforeText = text.substring(lastIndex, match.index);
+        
+        // Draw text before CVE
+        if (beforeText) {
+          page.drawText(beforeText, {
+            x: currentX,
+            y,
+            size,
+            font: textFont,
+            color: rgb(0, 0, 0),
+          });
+          currentX += textFont.widthOfTextAtSize(beforeText, size);
+        }
+        
+        // Draw CVE ID in blue with link
+        const cveWidth = textFont.widthOfTextAtSize(cveId, size);
+        page.drawText(cveId, {
+          x: currentX,
+          y,
+          size,
+          font: textFont,
+          color: rgb(0, 0, 1), // Blue color
+        });
+        
+        // Add clickable link annotation
+        const cveUrl = `${baseUrl}/cve-lookup?cveId=${cveId}`;
+        page.node.set(
+          pdfDoc.context.obj({
+            Type: 'Annot',
+            Subtype: 'Link',
+            Rect: [currentX, y - 2, currentX + cveWidth, y + size],
+            Border: [0, 0, 0],
+            A: {
+              Type: 'Action',
+              S: 'URI',
+              URI: pdfDoc.context.obj(cveUrl),
+            },
+          })
+        );
+        
+        currentX += cveWidth;
+        lastIndex = match.index + cveId.length;
+      }
+      
+      // Draw remaining text after last CVE
+      const remainingText = text.substring(lastIndex);
+      if (remainingText) {
+        page.drawText(remainingText, {
+          x: currentX,
+          y,
+          size,
+          font: textFont,
+          color: rgb(0, 0, 0),
+        });
       }
     }
     
