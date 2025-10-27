@@ -22,8 +22,12 @@ const Auth = () => {
   const { toast } = useToast();
 
   // Sign out user if they navigate to auth page while authenticated
+  // BUT don't sign out if this is a password recovery flow
   React.useEffect(() => {
-    if (!authLoading && user) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    
+    if (!authLoading && user && type !== 'recovery') {
       signOut();
     }
   }, [user, authLoading, signOut]);
