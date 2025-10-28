@@ -1,16 +1,20 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { ScanResults } from './ScanResults';
 
 interface DashboardProps {
   onNewScan: () => void;
 }
 
 export const Dashboard = ({ onNewScan }: DashboardProps) => {
+  const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  
   // Fetch dashboard statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats'],
@@ -195,7 +199,11 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
                 <div className="text-center py-4 text-slate-600">Loading recent scans...</div>
               ) : recentScans && recentScans.length > 0 ? (
                 recentScans.map((scan) => (
-                  <div key={scan.scan_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                  <div 
+                    key={scan.scan_id} 
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+                    onClick={() => scan.status === 'completed' && setSelectedScanId(scan.scan_id)}
+                  >
                     <div>
                       <p className="font-medium text-slate-900">{scan.target}</p>
                       <p className="text-sm text-slate-600">{formatDate(scan.start_time)}</p>
@@ -261,6 +269,15 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedScanId} onOpenChange={() => setSelectedScanId(null)}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Scan Results</DialogTitle>
+          </DialogHeader>
+          {selectedScanId && <ScanResults scanId={selectedScanId} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
