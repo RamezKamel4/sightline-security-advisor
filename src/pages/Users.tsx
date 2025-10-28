@@ -16,6 +16,7 @@ const Users = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'consultant'>('all');
 
   // Fetch all users with their roles
   const { data: users, isLoading, refetch } = useQuery({
@@ -90,7 +91,10 @@ const Users = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all ${roleFilter === 'all' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+          onClick={() => setRoleFilter('all')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             <Users2 className="h-4 w-4 text-muted-foreground" />
@@ -99,7 +103,10 @@ const Users = () => {
             <div className="text-2xl font-bold">{users?.length || 0}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all ${roleFilter === 'admin' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+          onClick={() => setRoleFilter('admin')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Administrators</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
@@ -110,7 +117,10 @@ const Users = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all ${roleFilter === 'consultant' ? 'ring-2 ring-primary' : 'hover:bg-accent'}`}
+          onClick={() => setRoleFilter('consultant')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Consultants</CardTitle>
             <Users2 className="h-4 w-4 text-muted-foreground" />
@@ -125,7 +135,11 @@ const Users = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Users</CardTitle>
+          <CardTitle>
+            {roleFilter === 'all' && 'All Users'}
+            {roleFilter === 'admin' && 'Administrators'}
+            {roleFilter === 'consultant' && 'Consultants'}
+          </CardTitle>
           <CardDescription>View and manage user accounts and permissions</CardDescription>
         </CardHeader>
         <CardContent>
@@ -142,7 +156,12 @@ const Users = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users?.map((user) => (
+              {users
+                ?.filter(user => {
+                  if (roleFilter === 'all') return true;
+                  return user.roles.includes(roleFilter);
+                })
+                .map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
                   <TableCell>{user.profile?.name || '-'}</TableCell>
