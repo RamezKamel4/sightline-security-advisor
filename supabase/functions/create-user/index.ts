@@ -44,28 +44,22 @@ Deno.serve(async (req) => {
     }
 
     // Get request body
-    const { email, password, name, roles: userRoles } = await req.json();
+    const { email, name, roles: userRoles } = await req.json();
 
     // Validate input
-    if (!email || !password || !name) {
-      return new Response(JSON.stringify({ error: 'Email, password, and name are required' }), {
+    if (!email || !name) {
+      return new Response(JSON.stringify({ error: 'Email and name are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (password.length < 6) {
-      return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Get redirect URL for password setup
+    const redirectUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`;
 
-    // Create user
-    const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
+    // Invite user - this sends an email with a link to set password
+    const { data: newUser, error: createError } = await supabaseClient.auth.admin.inviteUserByEmail(email, {
+      redirectTo: redirectUrl,
     });
 
     if (createError) {

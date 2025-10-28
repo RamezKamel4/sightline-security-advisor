@@ -11,7 +11,6 @@ import { z } from 'zod';
 
 const createUserSchema = z.object({
   email: z.string().trim().email('Invalid email address').max(255, 'Email must be less than 255 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(100, 'Password must be less than 100 characters'),
   name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
 });
 
@@ -26,7 +25,6 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     name: '',
   });
   const [roles, setRoles] = useState<string[]>([]);
@@ -58,10 +56,10 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
 
       toast({
         title: 'Success',
-        description: 'User created successfully',
+        description: 'User invited successfully. They will receive an email to set their password.',
       });
 
-      setFormData({ email: '', password: '', name: '' });
+      setFormData({ email: '', name: '' });
       setRoles([]);
       onOpenChange(false);
       onSuccess();
@@ -100,7 +98,7 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            Add a new user to the platform. They will receive an email to verify their account.
+            The user will receive an email invitation with a link to set their own password.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -127,18 +125,6 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
                 maxLength={255}
               />
               {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Min. 6 characters"
-                maxLength={100}
-              />
-              {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
             </div>
             <div className="grid gap-2">
               <Label>Roles</Label>
