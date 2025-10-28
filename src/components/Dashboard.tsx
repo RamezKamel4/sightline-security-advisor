@@ -82,7 +82,7 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
     }
   });
 
-  // Fetch recent scans
+  // Fetch recent scans with findings count
   const { data: recentScans, isLoading: scansLoading } = useQuery({
     queryKey: ['recent-scans'],
     queryFn: async () => {
@@ -96,7 +96,25 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
         .order('start_time', { ascending: false })
         .limit(3);
 
-      return data || [];
+      if (!data) return [];
+
+      // Fetch findings count for each scan
+      const scansWithFindings = await Promise.all(
+        data.map(async (scan) => {
+          const { data: findings } = await supabase
+            .from('findings')
+            .select('cve_id', { count: 'exact' })
+            .eq('scan_id', scan.scan_id)
+            .not('cve_id', 'is', null);
+
+          return {
+            ...scan,
+            findingsCount: findings?.length || 0
+          };
+        })
+      );
+
+      return scansWithFindings;
     }
   });
 
@@ -183,8 +201,8 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
                       <p className="text-sm text-slate-600">{formatDate(scan.start_time)}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskBadge(0)}`}>
-                        {getRiskLevel(0)}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskBadge(scan.findingsCount || 0)}`}>
+                        {getRiskLevel(scan.findingsCount || 0)}
                       </span>
                       <span className={getStatusBadge(scan.status || 'unknown')}>{scan.status}</span>
                     </div>
