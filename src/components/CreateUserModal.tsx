@@ -149,6 +149,16 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
                     Consultant
                   </label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="user" 
+                    checked={roles.includes('user')}
+                    onCheckedChange={() => toggleRole('user')}
+                  />
+                  <label htmlFor="user" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    User
+                  </label>
+                </div>
               </div>
             </div>
           </div>
