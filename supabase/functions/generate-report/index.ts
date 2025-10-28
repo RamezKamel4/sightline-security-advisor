@@ -401,8 +401,8 @@ Generate the complete report now.`;
         const textWidth = (isHeader ? boldFont : font).widthOfTextAtSize(testLine, fontSize);
         
         if (textWidth > maxWidth && currentLine) {
-          // Draw current line with CVE highlighting
-          drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
+          // Draw current line with CVE highlighting and links
+          drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl, pdfDoc);
           yPosition -= lineHeight;
           currentLine = word;
           
@@ -416,9 +416,9 @@ Generate the complete report now.`;
         }
       }
       
-      // Draw remaining text with CVE highlighting
+      // Draw remaining text with CVE highlighting and links
       if (currentLine) {
-        drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font);
+        drawLineWithCVEHighlight(currentPage, currentLine, margin, yPosition, fontSize, isHeader ? boldFont : font, appUrl, pdfDoc);
         yPosition -= lineHeight;
       }
       
@@ -428,8 +428,8 @@ Generate the complete report now.`;
       }
     }
     
-    // Helper function to draw text with CVE IDs in blue
-    function drawLineWithCVEHighlight(page: any, text: string, x: number, y: number, size: number, textFont: any) {
+    // Helper function to draw text with clickable CVE IDs in blue
+    function drawLineWithCVEHighlight(page: any, text: string, x: number, y: number, size: number, textFont: any, baseUrl: string, doc: any) {
       const cveMatches = Array.from(text.matchAll(cveRegex));
       
       if (cveMatches.length === 0) {
@@ -464,6 +464,7 @@ Generate the complete report now.`;
         }
         
         // Draw CVE ID in blue
+        const cveWidth = textFont.widthOfTextAtSize(cveId, size);
         page.drawText(cveId, {
           x: currentX,
           y,
@@ -472,7 +473,30 @@ Generate the complete report now.`;
           color: rgb(0, 0, 1), // Blue color
         });
         
-        currentX += textFont.widthOfTextAtSize(cveId, size);
+        // Add clickable link annotation for CVE ID
+        const cveUrl = `${baseUrl}/cve-lookup?cveId=${cveId}`;
+        const linkAnnotation = doc.context.register(
+          doc.context.obj({
+            Type: 'Annot',
+            Subtype: 'Link',
+            Rect: [currentX, y - 2, currentX + cveWidth, y + size],
+            Border: [0, 0, 0],
+            C: [0, 0, 1],
+            A: {
+              S: 'URI',
+              URI: cveUrl,
+            },
+          })
+        );
+        
+        const annotations = page.node.lookup('Annots');
+        if (annotations) {
+          annotations.push(linkAnnotation);
+        } else {
+          page.node.set('Annots', doc.context.obj([linkAnnotation]));
+        }
+        
+        currentX += cveWidth;
         lastIndex = match.index + cveId.length;
       }
       
