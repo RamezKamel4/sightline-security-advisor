@@ -15,7 +15,7 @@ PROFILE_EXTRA_SCRIPTS = {
     "web-apps": "http-enum,http-headers,http-title,ssl-cert,banner",
     "databases": "broadcast-sql-brute,banner,ssl-cert",
     "remote-access": "ssh-hostkey,sshv1,rdp-enum-encryption,banner,ssl-cert",
-    "comprehensive": "default,safe"
+    "comprehensive": "http-enum,http-headers,http-title,ssl-cert,banner,ssh-hostkey,default,safe"
 }
 
 def is_private_cidr(target: str) -> bool:
