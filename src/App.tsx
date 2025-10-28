@@ -14,6 +14,7 @@ import CVELookup from "./pages/CVELookup";
 import WorkflowGuide from "./pages/WorkflowGuide";
 import Users from "./pages/Users";
 import Analytics from "./pages/Analytics";
+import SetPassword from "./pages/SetPassword";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/set-password" element={<SetPassword />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Index />
