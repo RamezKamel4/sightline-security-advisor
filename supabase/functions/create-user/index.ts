@@ -82,10 +82,8 @@ Deno.serve(async (req) => {
       newUser = createdUser;
     }
 
-    // Determine the correct redirect URL based on environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const projectId = supabaseUrl.split('//')[1]?.split('.')[0];
-    const redirectUrl = `https://${projectId}.lovableproject.com/set-password`;
+    // Use the actual Lovable project URL for redirect
+    const redirectUrl = `https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com/set-password`;
     
     console.log('Redirect URL for password setup:', redirectUrl);
     
