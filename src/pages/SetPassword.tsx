@@ -26,16 +26,21 @@ const SetPassword = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Check if user is already authenticated
-    const checkAuth = async () => {
+    // Check if we have a recovery session
+    const checkRecoverySession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // If already logged in, redirect to home
-        navigate('/');
+      if (!session) {
+        // No session means the recovery link is invalid or expired
+        toast({
+          title: 'Invalid Link',
+          description: 'This password reset link is invalid or has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        navigate('/auth');
       }
     };
-    checkAuth();
-  }, [navigate]);
+    checkRecoverySession();
+  }, [navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,12 +58,15 @@ const SetPassword = () => {
 
       if (error) throw error;
 
+      // Sign out the user after setting password
+      await supabase.auth.signOut();
+
       toast({
         title: 'Success',
-        description: 'Password set successfully. You can now login.',
+        description: 'Password set successfully. Please login with your new password.',
       });
 
-      // Redirect to login after a short delay
+      // Redirect to login page
       setTimeout(() => {
         navigate('/auth');
       }, 1500);
