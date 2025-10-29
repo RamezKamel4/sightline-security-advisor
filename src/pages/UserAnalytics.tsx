@@ -112,6 +112,7 @@ const UserAnalytics = () => {
       const high = data.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 7.0 && f.cve.cvss_score < 9.0).length;
       const medium = data.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 4.0 && f.cve.cvss_score < 7.0).length;
       const low = data.filter(f => f.cve?.cvss_score && f.cve.cvss_score < 4.0).length;
+      const unknown = data.filter(f => !f.cve?.cvss_score).length;
 
       return {
         totalFindings,
@@ -121,7 +122,8 @@ const UserAnalytics = () => {
           { name: 'High', value: high, color: '#f97316' },
           { name: 'Medium', value: medium, color: '#eab308' },
           { name: 'Low', value: low, color: '#22c55e' },
-        ],
+          { name: 'Unknown', value: unknown, color: '#94a3b8' },
+        ].filter(item => item.value > 0),
       };
     },
     enabled: !!user,
