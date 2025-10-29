@@ -130,20 +130,43 @@ Deno.serve(async (req) => {
       console.log('RESEND_API_KEY not configured - email not sent. Password setup link logged above.');
     }
 
-    // Create user profile
-    const { error: profileError } = await supabaseClient
+    // Check if profile already exists for this email (orphaned record)
+    const { data: existingProfile } = await supabaseClient
       .from('users')
-      .insert({
-        user_id: newUser.user.id,
-        email,
-        name,
-        password_hash: 'managed_by_auth',
-      });
+      .select('user_id')
+      .eq('email', email)
+      .single();
 
-    if (profileError) {
-      // If profile creation fails, delete the auth user
-      await supabaseClient.auth.admin.deleteUser(newUser.user.id);
-      throw profileError;
+    if (existingProfile) {
+      // Update existing profile with new auth user ID
+      const { error: updateError } = await supabaseClient
+        .from('users')
+        .update({
+          user_id: newUser.user.id,
+          name,
+          password_hash: 'managed_by_auth',
+        })
+        .eq('email', email);
+
+      if (updateError) {
+        await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+        throw updateError;
+      }
+    } else {
+      // Create new profile
+      const { error: profileError } = await supabaseClient
+        .from('users')
+        .insert({
+          user_id: newUser.user.id,
+          email,
+          name,
+          password_hash: 'managed_by_auth',
+        });
+
+      if (profileError) {
+        await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+        throw profileError;
+      }
     }
 
     // Assign roles if provided
