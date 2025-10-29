@@ -17,6 +17,7 @@ import Analytics from "./pages/Analytics";
 import SetPassword from "./pages/SetPassword";
 import History from "./pages/History";
 import SettingsPage from "./pages/SettingsPage";
+import UserAnalytics from "./pages/UserAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,13 @@ const App = () => (
               <ProtectedRoute>
                 <Layout activeView="settings">
                   <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Layout activeView="analytics">
+                  <UserAnalytics />
                 </Layout>
               </ProtectedRoute>
             } />

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info, Users, BarChart3 } from 'lucide-react';
+import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info, Users, BarChart3, LineChart } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NavLink } from 'react-router-dom';
@@ -37,6 +37,7 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Shield, path: '/' },
     { id: 'history', label: 'Scan History', icon: FileText, path: '/history' },
+    { id: 'analytics', label: 'Analytics', icon: LineChart, path: '/analytics' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/settings' },
   ];
 
