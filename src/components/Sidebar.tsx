@@ -36,8 +36,8 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Shield, path: '/' },
-    { id: 'history', label: 'Scan History', icon: FileText, path: '/' },
-    { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/' },
+    { id: 'history', label: 'Scan History', icon: FileText, path: '/history' },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/settings' },
   ];
 
   const adminMenuItems = [
@@ -77,17 +77,20 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
               const Icon = item.icon;
               return (
                 <li key={item.id}>
-                  <button
+                  <NavLink
+                    to={item.path}
                     onClick={() => onViewChange(item.id)}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      activeView === item.id
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`}
+                    className={({ isActive }) => 
+                      `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
                   >
                     <Icon className="h-5 w-5" />
                     <span className="font-medium">{item.label}</span>
-                  </button>
+                  </NavLink>
                 </li>
               );
             })}
