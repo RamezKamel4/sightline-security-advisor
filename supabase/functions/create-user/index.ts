@@ -55,18 +55,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate a temporary password
-    const tempPassword = crypto.randomUUID();
+    // Check if user already exists in auth
+    const { data: existingAuthUsers } = await supabaseClient.auth.admin.listUsers();
+    const existingAuthUser = existingAuthUsers?.users?.find(u => u.email === email);
 
-    // Create user with temporary password
-    const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: false, // Require email confirmation
-    });
+    let newUser;
+    
+    if (existingAuthUser) {
+      // User already exists in auth, just use the existing user
+      console.log('User already exists in auth, reusing existing user:', existingAuthUser.id);
+      newUser = { user: existingAuthUser };
+    } else {
+      // Generate a temporary password
+      const tempPassword = crypto.randomUUID();
 
-    if (createError) {
-      throw createError;
+      // Create user with temporary password
+      const { data: createdUser, error: createError } = await supabaseClient.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: false,
+      });
+
+      if (createError) {
+        throw createError;
+      }
+      
+      newUser = createdUser;
     }
 
     // Generate password reset link with redirect to /set-password
