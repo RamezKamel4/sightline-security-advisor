@@ -135,6 +135,13 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
     try:
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
         
+        # Skip CVE lookup for generic services without version info
+        # These return too many false positives
+        generic_services = ["upnp", "http-alt", "http-proxy", "https-alt", "ppp", "cslistener"]
+        if service_name.lower() in generic_services and (not version or version == "unknown"):
+            print(f"⏭️ Skipping CVE lookup for generic service '{service_name}' without version")
+            return []
+        
         # Construct search query
         if version and version != "unknown":
             search_query = f"{service_name} {version}"
