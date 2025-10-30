@@ -225,7 +225,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   const getRiskLevel = () => {
-    const criticalCVEs = findings.filter(f => f.cve_id && f.cve_id.trim() !== '').length;
+    const criticalCVEs = findings.filter(f => f.cve_id).length;
     const highScoreCVEs = findings.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 7.0).length;
     
     if (highScoreCVEs > 3 || criticalCVEs > 5) return { level: 'High', color: 'bg-red-100 text-red-800' };
@@ -305,7 +305,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               <AlertTriangle className="h-5 w-5 text-red-500" />
               <div>
                 <p className="text-sm text-slate-600">Vulnerabilities</p>
-                <p className="text-2xl font-bold">{findings.filter(f => f.cve_id && f.cve_id.trim() !== '').length}</p>
+                <p className="text-2xl font-bold">{findings.filter(f => f.cve_id).length}</p>
               </div>
             </div>
           </CardContent>
