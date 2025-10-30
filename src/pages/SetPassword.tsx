@@ -52,24 +52,24 @@ const SetPassword = () => {
       const validatedData = passwordSchema.parse({ password, confirmPassword });
 
       // Update password for the user
-      const { error } = await supabase.auth.updateUser({
+      const { error: updateError } = await supabase.auth.updateUser({
         password: validatedData.password,
       });
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
       // Sign out the user completely
-      await supabase.auth.signOut();
+      const { error: signOutError } = await supabase.auth.signOut();
+      
+      if (signOutError) throw signOutError;
 
       toast({
         title: 'Success',
         description: 'Password updated successfully. Please sign in with your new password.',
       });
 
-      // Wait a moment for sign out to complete, then redirect
-      setTimeout(() => {
-        window.location.href = '/auth';
-      }, 1000);
+      // Force redirect to auth page with full page reload
+      window.location.replace('/auth');
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
