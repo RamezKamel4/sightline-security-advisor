@@ -93,35 +93,41 @@ Deno.serve(async (req) => {
 
     console.log('Generated password setup link:', recoveryData.properties.action_link);
 
-    // Send email with password setup link using Resend
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+    // Send email with password setup link using Resend (if API key is available)
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
     
-    try {
-      const emailResponse = await resend.emails.send({
-        from: 'VulnScan AI <admin@vulnscanai.com>',
-        to: [email],
-        subject: 'Set Your Password - VulnScan AI',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Welcome to VulnScan AI!</h2>
-            <p>Hello ${name},</p>
-            <p>An administrator has created an account for you. Please click the button below to set your password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${recoveryData.properties.action_link}" 
-                 style="background-color: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Set Your Password
-              </a>
+    if (resendApiKey) {
+      try {
+        const resend = new Resend(resendApiKey);
+        
+        const emailResponse = await resend.emails.send({
+          from: 'VulnScan AI <admin@vulnscanai.com>',
+          to: [email],
+          subject: 'Set Your Password - VulnScan AI',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Welcome to VulnScan AI!</h2>
+              <p>Hello ${name},</p>
+              <p>An administrator has created an account for you. Please click the button below to set your password:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${recoveryData.properties.action_link}" 
+                   style="background-color: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                  Set Your Password
+                </a>
+              </div>
+              <p style="color: #666; font-size: 14px;">This link will expire in 24 hours.</p>
+              <p style="color: #666; font-size: 14px;">If you didn't request this, please ignore this email.</p>
             </div>
-            <p style="color: #666; font-size: 14px;">This link will expire in 24 hours.</p>
-            <p style="color: #666; font-size: 14px;">If you didn't request this, please ignore this email.</p>
-          </div>
-        `,
-      });
-      
-      console.log('Password setup email sent successfully:', emailResponse);
-    } catch (emailError) {
-      console.error('Error sending email:', emailError);
-      // Continue even if email fails - admin can resend
+          `,
+        });
+        
+        console.log('Password setup email sent successfully:', emailResponse);
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        // Continue even if email fails - link is logged for manual sending
+      }
+    } else {
+      console.log('RESEND_API_KEY not configured - email not sent. Password setup link logged above.');
     }
 
     // Create user profile

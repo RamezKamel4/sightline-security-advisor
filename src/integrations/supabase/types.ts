@@ -140,9 +140,11 @@ export type Database = {
         Row: {
           cve_enriched: boolean
           end_time: string | null
+          estimated_hosts: number | null
           host_info: Json | null
           nmap_cmd: string | null
           nmap_output: string | null
+          normalized_target: string | null
           profile: string | null
           scan_id: string
           scan_source: string | null
@@ -151,13 +153,16 @@ export type Database = {
           target: string
           use_arp_discovery: boolean | null
           user_id: string
+          user_input_target: string | null
         }
         Insert: {
           cve_enriched?: boolean
           end_time?: string | null
+          estimated_hosts?: number | null
           host_info?: Json | null
           nmap_cmd?: string | null
           nmap_output?: string | null
+          normalized_target?: string | null
           profile?: string | null
           scan_id?: string
           scan_source?: string | null
@@ -166,13 +171,16 @@ export type Database = {
           target: string
           use_arp_discovery?: boolean | null
           user_id: string
+          user_input_target?: string | null
         }
         Update: {
           cve_enriched?: boolean
           end_time?: string | null
+          estimated_hosts?: number | null
           host_info?: Json | null
           nmap_cmd?: string | null
           nmap_output?: string | null
+          normalized_target?: string | null
           profile?: string | null
           scan_id?: string
           scan_source?: string | null
@@ -181,6 +189,7 @@ export type Database = {
           target?: string
           use_arp_discovery?: boolean | null
           user_id?: string
+          user_input_target?: string | null
         }
         Relationships: []
       }
