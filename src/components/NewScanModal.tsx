@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,6 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { createScan } from '@/services/scanService';
 import { ScanPermissionModal } from './ScanPermissionModal';
-import { previewTargetNormalization, requiresConfirmation } from '@/utils/targetNormalizer';
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface NewScanModalProps {
   isOpen: boolean;
@@ -26,34 +23,13 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
   const [isLoading, setIsLoading] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [pendingScanData, setPendingScanData] = useState<any>(null);
-  const [targetPreview, setTargetPreview] = useState<ReturnType<typeof previewTargetNormalization> | null>(null);
   const { toast } = useToast();
-  
-  // Preview target normalization as user types
-  useEffect(() => {
-    if (target.trim()) {
-      const preview = previewTargetNormalization(target);
-      setTargetPreview(preview);
-    } else {
-      setTargetPreview(null);
-    }
-  }, [target]);
 
   const handleStartScan = async () => {
     if (!target || !scanProfile) {
       toast({
         title: "Missing Information",
         description: "Please fill in the target and scan profile.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Validate target
-    if (!targetPreview || !targetPreview.isValid) {
-      toast({
-        title: "Invalid Target",
-        description: targetPreview?.error || "Please enter a valid target.",
         variant: "destructive"
       });
       return;
@@ -124,53 +100,15 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
                   </Label>
                   <Input
                     id="target"
-                    placeholder="e.g., 192.168.1.0 or 192.168.1.0/24 or example.com"
+                    placeholder="e.g., 192.168.1.0/24 or example.com"
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                     className="mt-1"
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    IP address, CIDR notation, hostname, or range (e.g., 192.168.1.10-20)
+                  <p className="text-xs text-slate-600 mt-1">
+                    Enter an IP address, domain name, or IP range (CIDR notation)
                   </p>
-                  
-                  {/* Target Preview and Validation */}
-                  {targetPreview && (
-                    <div className="mt-3 space-y-2">
-                      {targetPreview.isValid ? (
-                        <>
-                          {targetPreview.normalized !== targetPreview.original && (
-                            <Alert>
-                              <Info className="h-4 w-4" />
-                              <AlertDescription>
-                                <span className="font-medium">Will scan:</span> {targetPreview.normalized}
-                                {targetPreview.hostsCount && (
-                                  <span className="text-muted-foreground"> ({targetPreview.hostsCount.toLocaleString()} host{targetPreview.hostsCount !== 1 ? 's' : ''})</span>
-                                )}
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                          {targetPreview.warnings.map((warning, idx) => (
-                            <Alert key={idx} variant={targetPreview.hostsCount && targetPreview.hostsCount > 1024 ? "destructive" : "default"}>
-                              <AlertCircle className="h-4 w-4" />
-                              <AlertDescription>{warning}</AlertDescription>
-                            </Alert>
-                          ))}
-                          {targetPreview.hostsCount && targetPreview.hostsCount <= 256 && (
-                            <div className="flex items-center gap-2 text-xs text-green-600">
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span>Target validated successfully</span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{targetPreview.error}</AlertDescription>
-                        </Alert>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -219,7 +157,7 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
           </Button>
           <Button 
             onClick={handleStartScan}
-            disabled={!target || !scanProfile || isLoading || !targetPreview?.isValid}
+            disabled={!target || !scanProfile || isLoading}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? 'Starting Scan...' : 'Start Scan'}

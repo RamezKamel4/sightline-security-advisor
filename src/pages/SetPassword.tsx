@@ -26,21 +26,16 @@ const SetPassword = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    // Check if we have a recovery session
-    const checkRecoverySession = async () => {
+    // Check if user is already authenticated
+    const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        // No session means the recovery link is invalid or expired
-        toast({
-          title: 'Invalid Link',
-          description: 'This password reset link is invalid or has expired. Please request a new one.',
-          variant: 'destructive',
-        });
-        navigate('/auth');
+      if (session) {
+        // If already logged in, redirect to home
+        navigate('/');
       }
     };
-    checkRecoverySession();
-  }, [navigate, toast]);
+    checkAuth();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,24 +47,21 @@ const SetPassword = () => {
       const validatedData = passwordSchema.parse({ password, confirmPassword });
 
       // Update password for the user
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: validatedData.password,
       });
 
-      if (updateError) throw updateError;
-
-      // Sign out the user completely
-      const { error: signOutError } = await supabase.auth.signOut();
-      
-      if (signOutError) throw signOutError;
+      if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Password updated successfully. Please sign in with your new password.',
+        description: 'Password set successfully. You can now login.',
       });
 
-      // Force redirect to auth page with full page reload
-      window.location.replace('/auth');
+      // Redirect to login after a short delay
+      setTimeout(() => {
+        navigate('/auth');
+      }, 1500);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};

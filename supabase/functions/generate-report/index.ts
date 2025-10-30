@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
+import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -129,11 +129,6 @@ serve(async (req) => {
         })
       : [];
 
-    // Check if there are meaningful vulnerabilities (with CVE IDs and reasonable CVSS scores)
-    const hasMeaningfulVulnerabilities = findingsWithCVE.some(f => 
-      f.cve_id && f.cvss_score && f.cvss_score >= 5.0
-    );
-    
     // Create a structured summary for the prompt
     const findingsSummary = findingsWithCVE.length > 0
       ? findingsWithCVE.map((f, index) => {
@@ -155,72 +150,8 @@ serve(async (req) => {
         }).join('\n')
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
-    // Generate different prompts based on whether vulnerabilities were found
-    let prompt = '';
-    
-    if (!hasMeaningfulVulnerabilities) {
-      // Prompt for clean systems with no significant vulnerabilities
-      prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
-
-SCAN RESULTS:
-The scan of ${scan.target} completed successfully. The system was scanned and ${findingsWithCVE.length} open port(s) were found, but NO high-risk vulnerabilities with CVE IDs were detected after filtering.
-
-OPEN SERVICES DETECTED:
-${findingsWithCVE.map((f, idx) => `${idx + 1}. Port ${f.port} - ${f.service} ${f.version}`).join('\n')}
-
-CRITICAL INSTRUCTIONS:
-0. DO NOT include any preamble or introduction - start DIRECTLY with the Executive Summary section
-1. This is a POSITIVE security report - the system appears secure
-2. Do NOT invent vulnerabilities or CVEs that were not found
-3. Keep the report brief (500-700 words total)
-4. Focus on what was scanned and confirmed secure
-
-Generate a client-ready security report with the following structure:
-
-## 1. EXECUTIVE SUMMARY
-- State that the vulnerability scan completed successfully
-- Confirm that NO critical or high-risk vulnerabilities with known CVEs were detected
-- Note that the open ports found are running standard services that appear properly configured
-- Overall risk level: LOW
-- Provide reassuring but professional tone
-
-## 2. SCAN RESULTS
-- List the open ports and services found
-- Confirm that after cross-referencing with the National Vulnerability Database (NVD), no known CVEs matched the detected services
-- Note that this indicates the services are likely up-to-date or properly hardened
-
-## 3. BEST PRACTICE RECOMMENDATIONS
-Even though no vulnerabilities were found, provide general security recommendations:
-- Continue applying regular security updates
-- Maintain active firewall and antivirus protection
-- Schedule periodic vulnerability scans (monthly or quarterly)
-- Review access controls and user permissions
-- Enable security logging and monitoring
-- Consider security awareness training for staff
-
-## 4. SCAN METHODOLOGY
-Briefly explain:
-- What was scanned (IP address/range, ports, services)
-- How the scan worked (network scanning + CVE database matching)
-- Limitations (point-in-time assessment, new vulnerabilities may emerge)
-
-## 5. TECHNICAL SUMMARY
-- Scan target: ${scan.target}
-- Scan profile: ${scan.profile || 'Default'}
-- Open ports detected: ${findingsWithCVE.length}
-- CVEs detected: 0
-- Overall assessment: System appears secure
-
-STYLE REQUIREMENTS:
-- Professional and reassuring tone
-- Clear, non-technical language in Executive Summary
-- Actionable recommendations
-- Brief and concise (do not pad the report)
-
-Generate the complete report now.`;
-    } else {
-      // Standard prompt for systems with vulnerabilities
-      prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
+    // Generate AI report using Gemini with explicit instructions
+    const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
 
 SCAN FINDINGS:
 ${findingsSummary}
@@ -293,7 +224,6 @@ DO NOT include any "Raw Tool Outputs" section
 - Use bullet points and clear section headers for easy PDF conversion
 
 Generate the complete report now.`;
-    }
 
     console.log('Making Gemini API request with retry logic...');
 
