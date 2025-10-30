@@ -28,6 +28,96 @@ EXCLUDED_KEYWORDS = [
     "broadband router", "access point", "wrt54g", "fritzbox router firmware"
 ]
 
+# Router vendor exclusion list for cross-contamination prevention
+EXCLUDED_VENDORS = ["tenda", "tp-link", "d-link", "zyxel", "asus router", "netgear", "linksys", "buffalo", "belkin"]
+
+# Known service to vendor mapping
+SERVICE_VENDOR_MAP = {
+    "FRITZ!Box http config": "AVM FRITZ!Box",
+    "FRITZ!OS": "AVM FRITZ!Box",
+    "Tenda http config": "Tenda",
+    "TP-Link router http": "TP-Link",
+    "D-Link router admin": "D-Link",
+    "Netgear genie": "Netgear"
+}
+
+def detect_vendor(service_name: str, version: str) -> str:
+    """
+    Detect vendor/product name from service info.
+    """
+    combined = f"{service_name} {version}".lower()
+    
+    # Check known service map first
+    if service_name in SERVICE_VENDOR_MAP:
+        return SERVICE_VENDOR_MAP[service_name]
+    
+    # Pattern matching
+    if "fritz" in combined or "avm" in combined:
+        return "AVM FRITZ!Box"
+    elif "tenda" in combined:
+        return "Tenda"
+    elif "tp-link" in combined:
+        return "TP-Link"
+    elif "d-link" in combined:
+        return "D-Link"
+    elif "netgear" in combined:
+        return "Netgear"
+    elif "asus" in combined and "router" in combined:
+        return "ASUS"
+    elif "cisco" in combined:
+        return "Cisco"
+    elif "zyxel" in combined:
+        return "Zyxel"
+    
+    return "Generic"
+
+def filter_cves_by_vendor(cve_results: List[Dict[str, Any]], product_name: str) -> List[Dict[str, Any]]:
+    """
+    Filter CVEs to only include those matching the detected vendor/product.
+    """
+    if product_name == "Generic":
+        return cve_results
+    
+    product = product_name.lower()
+    filtered = []
+    
+    for cve in cve_results:
+        text = (cve.get("title", "") + " " + cve.get("description", "")).lower()
+        if product.lower().split()[0] in text:  # Match first word of product (e.g., "AVM" or "FRITZ!Box")
+            filtered.append(cve)
+        # Include if no specific vendor mentioned (generic vulnerability)
+        elif not any(vendor in text for vendor in EXCLUDED_VENDORS + ["cisco", "zyxel"]):
+            filtered.append(cve)
+    
+    print(f"🔍 Vendor filter ({product_name}): {len(cve_results)} → {len(filtered)} CVEs")
+    return filtered
+
+def exclude_unrelated_router_cves(cve_results: List[Dict[str, Any]], product_name: str) -> List[Dict[str, Any]]:
+    """
+    Exclude CVEs from other router vendors when a specific vendor is detected.
+    """
+    if product_name == "Generic":
+        return cve_results
+    
+    product = product_name.lower()
+    filtered = []
+    
+    for cve in cve_results:
+        text = (cve.get("title", "") + " " + cve.get("description", "")).lower()
+        
+        # If CVE mentions another vendor but not ours, exclude it
+        is_other_vendor = any(v in text for v in EXCLUDED_VENDORS + ["cisco", "zyxel"])
+        is_our_vendor = any(part in text for part in product.split())
+        
+        if is_other_vendor and not is_our_vendor:
+            print(f"🚫 Excluded {cve['id']} - different vendor detected")
+            continue
+        
+        filtered.append(cve)
+    
+    print(f"🔍 Cross-vendor filter: {len(cve_results)} → {len(filtered)} CVEs")
+    return filtered
+
 def filter_cves_by_os(os_name: str, cve_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Filter CVEs based on detected OS type.
@@ -139,21 +229,24 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
     try:
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
         
+        # Detect vendor/product from service info
+        product = detect_vendor(service_name, version)
+        print(f"🏷️ Detected vendor/product: {product}")
+        
         # Skip CVE lookup for generic services without version info
-        # These return too many false positives
         generic_services = ["upnp", "http-alt", "http-proxy", "https-alt", "ppp", "cslistener"]
-        if service_name.lower() in generic_services and (not version or version == "unknown"):
+        if product == "Generic" and service_name.lower() in generic_services and (not version or version == "unknown"):
             print(f"⏭️ Skipping CVE lookup for generic service '{service_name}' without version")
             return []
         
-        # Construct search query with product name extraction
+        # Construct search query with vendor/product awareness
         search_query = ""
-        if version and version != "unknown":
+        if product != "Generic":
+            # Use detected product name for precise matching
+            search_query = product
+        elif version and version != "unknown":
             # Extract product name from version string for better CVE matching
-            # E.g., "FRITZ!Box http config" -> "FRITZ!Box"
-            if "FRITZ!Box" in version.upper():
-                search_query = "FRITZ!Box"
-            elif "nginx" in version.lower():
+            if "nginx" in version.lower():
                 search_query = f"nginx {version}"
             elif "apache" in version.lower():
                 search_query = f"apache {version}"
@@ -212,10 +305,12 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
         
         print(f"✅ Found {len(cves)} raw CVEs for {service_name}")
 
-        # 🔍 Apply filters to improve relevance
-        cves = exclude_unrelated_cves(cves)
-        cves = filter_by_age_and_score(cves)
-        cves = filter_cves_by_os(os_name, cves)
+        # 🔍 Apply filters to improve relevance (order matters!)
+        cves = exclude_unrelated_router_cves(cves, product)  # Remove other vendors first
+        cves = filter_cves_by_vendor(cves, product)  # Keep only matching vendor
+        cves = exclude_unrelated_cves(cves)  # Generic keyword filtering
+        cves = filter_by_age_and_score(cves)  # Filter by year and CVSS
+        cves = filter_cves_by_os(os_name, cves)  # OS-specific filtering
 
         print(f"✅ Final: {len(cves)} relevant CVEs for {service_name}")
 
