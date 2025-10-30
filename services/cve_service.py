@@ -213,6 +213,148 @@ def filter_by_age_and_score(cve_results: List[Dict[str, Any]]) -> List[Dict[str,
     print(f"🔍 Age/Score filter: {len(cve_results)} → {len(filtered)} CVEs")
     return filtered
 
+def strict_match_cve_to_evidence(cve: dict, service_info: dict, evidence: dict) -> bool:
+    """
+    Return True only if there is direct evidence linking the CVE to the scanned service.
+    
+    service_info: {
+        'service_name': 'upnp',
+        'banner': 'miniupnpd/1.9',
+        'version': '1.9',
+        'product': 'miniupnpd',
+        'fingerprint_confidence': 85
+    }
+    evidence: {
+        'server_header': 'miniupnpd/1.9',
+        'html_title': '...',
+        'body_tokens': ['tenda', 'ac18'],
+        'reachable_paths': ['/goform/SetUpnpCfg'],
+        'upnp_model': 'AC18',
+        'upnp_manufacturer': 'Tenda'
+    }
+    
+    REJECTION REASONS (documented for transparency):
+    - No product name match in banner/headers/body
+    - CVE mentions specific vendor but no evidence of that vendor present
+    - Low fingerprint confidence (<80%) with no other evidence
+    - Port-only or generic service match without version/banner confirmation
+    """
+    title_desc = (cve.get("title", "") + " " + cve.get("description", "")).lower()
+    svc = service_info.get("service_name", "").lower()
+    banner = service_info.get("banner", "").lower()
+    version = service_info.get("version", "").lower()
+    product = service_info.get("product", "").lower()
+    
+    # 1) CVE ENDPOINT MATCHING: If CVE mentions specific vulnerable endpoint, require it to be reachable
+    endpoint_paths = re.findall(r"(/[\w\-\./]+)", title_desc)
+    for path in endpoint_paths:
+        # Only consider reasonable endpoint paths (not random text)
+        if 1 < len(path) < 80 and "/" in path:
+            reachable = evidence.get("reachable_paths", [])
+            if reachable and path in reachable:
+                print(f"✅ CVE {cve['id']} matched: vulnerable endpoint {path} reachable")
+                return True
+    
+    # 2) VENDOR-SPECIFIC CVE: If CVE explicitly mentions a router vendor, require evidence
+    router_vendors = {
+        "tenda": ["tenda", "ac18", "ac15"],
+        "fritz": ["fritz", "avm", "fritz!box"],
+        "tp-link": ["tp-link", "tplink"],
+        "d-link": ["d-link", "dlink"],
+        "netgear": ["netgear"],
+        "asus": ["asus router"],
+        "cisco": ["cisco"],
+        "zyxel": ["zyxel"]
+    }
+    
+    cve_vendor = None
+    for vendor, keywords in router_vendors.items():
+        if any(kw in title_desc for kw in keywords):
+            cve_vendor = vendor
+            break
+    
+    if cve_vendor:
+        # This CVE is vendor-specific, require evidence of that vendor
+        vendor_keywords = router_vendors[cve_vendor]
+        
+        # Check banner
+        if any(kw in banner for kw in vendor_keywords):
+            print(f"✅ CVE {cve['id']} matched: {cve_vendor} found in banner")
+            return True
+        
+        # Check server header
+        server_header = evidence.get("server_header", "").lower()
+        if any(kw in server_header for kw in vendor_keywords):
+            print(f"✅ CVE {cve['id']} matched: {cve_vendor} found in server header")
+            return True
+        
+        # Check HTML title
+        html_title = evidence.get("html_title", "").lower()
+        if any(kw in html_title for kw in vendor_keywords):
+            print(f"✅ CVE {cve['id']} matched: {cve_vendor} found in HTML title")
+            return True
+        
+        # Check body tokens
+        body_tokens = evidence.get("body_tokens", [])
+        if any(kw in body_tokens for kw in vendor_keywords):
+            print(f"✅ CVE {cve['id']} matched: {cve_vendor} found in page body")
+            return True
+        
+        # Check UPnP device info
+        upnp_model = evidence.get("upnp_model", "").lower()
+        upnp_mfr = evidence.get("upnp_manufacturer", "").lower()
+        if any(kw in upnp_model for kw in vendor_keywords) or any(kw in upnp_mfr for kw in vendor_keywords):
+            print(f"✅ CVE {cve['id']} matched: {cve_vendor} found in UPnP device info")
+            return True
+        
+        # NO EVIDENCE OF VENDOR -> REJECT
+        print(f"🚫 CVE {cve['id']} rejected: mentions {cve_vendor} but no evidence found")
+        return False
+    
+    # 3) VERSION MATCHING: If CVE mentions specific version, require version match
+    cve_versions = re.findall(r"\b(\d+\.\d+(?:\.\d+)*)\b", title_desc)
+    if cve_versions and version:
+        for cve_ver in cve_versions:
+            if cve_ver in version:
+                print(f"✅ CVE {cve['id']} matched: version {cve_ver} found")
+                return True
+    
+    # 4) PRODUCT MATCHING: If CVE mentions specific product, require product in banner/evidence
+    common_products = ["apache", "nginx", "openssh", "bind", "postfix", "mysql", "postgresql", 
+                       "miniupnpd", "libupnp", "samba", "vsftpd"]
+    
+    cve_product = None
+    for prod in common_products:
+        if prod in title_desc:
+            cve_product = prod
+            break
+    
+    if cve_product:
+        # Require product name in banner or server header
+        if cve_product in banner or cve_product in product:
+            print(f"✅ CVE {cve['id']} matched: product {cve_product} found in banner")
+            return True
+        
+        server_header = evidence.get("server_header", "").lower()
+        if cve_product in server_header:
+            print(f"✅ CVE {cve['id']} matched: product {cve_product} found in server header")
+            return True
+        
+        # No product match
+        print(f"🚫 CVE {cve['id']} rejected: mentions {cve_product} but not found in service")
+        return False
+    
+    # 5) HIGH-CONFIDENCE GENERIC MATCH: If fingerprint confidence is high (>=80%) and CVE is generic
+    fingerprint_conf = service_info.get("fingerprint_confidence", 0)
+    if fingerprint_conf >= 80 and svc in title_desc:
+        # Generic service CVE with high confidence fingerprint
+        print(f"✅ CVE {cve['id']} matched: high-confidence ({fingerprint_conf}%) generic match")
+        return True
+    
+    # 6) DEFAULT REJECT: No sufficient evidence
+    print(f"🚫 CVE {cve['id']} rejected: no evidence (port-only or generic keyword match)")
+    return False
+
 def save_cves_to_supabase(cves: List[Dict[str, Any]]):
     """
     Save CVEs into Supabase `cve` table, avoiding duplicates.
@@ -233,7 +375,8 @@ def save_cves_to_supabase(cves: List[Dict[str, Any]]):
         except Exception as e:
             print(f"⚠️ Failed to save {cve['id']} - {e}")
 
-def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unknown") -> List[Dict[str, Any]]:
+def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unknown", 
+                           service_info: Dict[str, Any] = None, evidence: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     """
     Fetch CVEs for a given service and version from NVD API,
     apply smart filters, then save them to Supabase.
@@ -322,12 +465,20 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
         
         print(f"✅ Found {len(cves)} raw CVEs for {service_name}")
 
-        # 🔍 Apply filters to improve relevance (order matters!)
-        cves = exclude_unrelated_router_cves(cves, product)  # Remove other vendors first
-        cves = filter_cves_by_vendor(cves, product)  # Keep only matching vendor
-        cves = exclude_unrelated_cves(cves)  # Generic keyword filtering
-        cves = filter_by_age_and_score(cves)  # Filter by year and CVSS
-        cves = filter_cves_by_os(os_name, cves)  # OS-specific filtering
+        # 🔍 STRICT EVIDENCE-BASED FILTERING (NEW)
+        if service_info and evidence:
+            print(f"🔬 Applying strict evidence-based filtering...")
+            cves_before = len(cves)
+            cves = [cve for cve in cves if strict_match_cve_to_evidence(cve, service_info, evidence)]
+            print(f"🔬 Strict filter: {cves_before} → {len(cves)} CVEs (rejected {cves_before - len(cves)} without evidence)")
+        else:
+            # Fallback to old filtering if no evidence provided (backward compatibility)
+            print(f"⚠️ No evidence provided, using legacy filtering...")
+            cves = exclude_unrelated_router_cves(cves, product)  # Remove other vendors first
+            cves = filter_cves_by_vendor(cves, product)  # Keep only matching vendor
+            cves = exclude_unrelated_cves(cves)  # Generic keyword filtering
+            cves = filter_by_age_and_score(cves)  # Filter by year and CVSS
+            cves = filter_cves_by_os(os_name, cves)  # OS-specific filtering
 
         print(f"✅ Final: {len(cves)} relevant CVEs for {service_name}")
 

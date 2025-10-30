@@ -4,6 +4,7 @@ import traceback
 from fastapi import HTTPException
 from services.cve_service import fetch_cves_for_service
 from services.service_probe import probe_http_service, probe_banner, merge_detection_results
+from services.banner_utils import collect_http_evidence, extract_service_info
 from typing import List, Dict, Any
 import re
 import socket
@@ -227,9 +228,38 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 # CVE enrichment only for open ports with known services
                 if port_state == "open" and search_service_name.lower() != "unknown":
                     try:
-                        cves = fetch_cves_for_service(search_service_name, search_version, detected_os)
+                        # 🔬 COLLECT EVIDENCE for strict CVE matching
+                        evidence = {}
+                        service_info_dict = {
+                            "service_name": service_name,
+                            "banner": f"{product} {version_str}".strip(),
+                            "version": version_str,
+                            "product": product,
+                            "fingerprint_confidence": int(port_info.get('conf', 5)) * 10  # nmap conf is 0-10, scale to 0-100
+                        }
+                        
+                        # Collect HTTP/HTTPS evidence for web services
+                        if port in [80, 443, 8000, 8080, 8443, 3000, 5000, 9000]:
+                            print(f"🔬 Collecting evidence from {host}:{port}...")
+                            evidence = collect_http_evidence(host, port)
+                            print(f"✅ Evidence collected: {list(evidence.keys())}")
+                        
+                        # Use probe_data if available
+                        if probe_data:
+                            evidence['server_header'] = probe_data.get('headers', {}).get('server', '')
+                            if probe_data.get('raw_banner'):
+                                service_info_dict['banner'] = probe_data['raw_banner']
+                        
+                        # Fetch CVEs with evidence-based filtering
+                        cves = fetch_cves_for_service(
+                            search_service_name, 
+                            search_version, 
+                            detected_os,
+                            service_info=service_info_dict,
+                            evidence=evidence
+                        )
                         service_data["cves"] = cves
-                        print(f"📄 Found {len(cves)} relevant CVEs for {search_service_name}")
+                        print(f"📄 Found {len(cves)} relevant CVEs for {search_service_name} (evidence-filtered)")
                     except Exception as e:
                         print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
                         traceback.print_exc()
