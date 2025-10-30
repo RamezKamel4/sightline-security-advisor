@@ -58,18 +58,16 @@ const SetPassword = () => {
 
       if (error) throw error;
 
-      // Sign out the user after setting password
-      await supabase.auth.signOut();
-
       toast({
         title: 'Success',
         description: 'Password set successfully. Please login with your new password.',
       });
 
-      // Redirect to login page
-      setTimeout(() => {
-        navigate('/auth');
-      }, 1500);
+      // Sign out the user and redirect to login page
+      await supabase.auth.signOut();
+      
+      // Navigate immediately after signout completes
+      navigate('/auth', { replace: true });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
