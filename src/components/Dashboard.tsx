@@ -68,11 +68,11 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
 
         if (findings) {
           // Count findings with CVEs as vulnerabilities
-          const vulnerableFindings = findings.filter(f => f.cve_id);
+          const vulnerableFindings = findings.filter(f => f.cve_id && f.cve_id.trim() !== '');
           criticalFindings = vulnerableFindings.length;
           
           // Count findings without CVEs as secure services
-          secureServices = findings.filter(f => !f.cve_id).length;
+          secureServices = findings.filter(f => !f.cve_id || f.cve_id.trim() === '').length;
         }
       }
 
@@ -107,13 +107,16 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
         data.map(async (scan) => {
           const { data: findings } = await supabase
             .from('findings')
-            .select('cve_id', { count: 'exact' })
+            .select('cve_id')
             .eq('scan_id', scan.scan_id)
             .not('cve_id', 'is', null);
 
+          // Filter out empty strings on client side
+          const validFindings = findings?.filter(f => f.cve_id && f.cve_id.trim() !== '') || [];
+
           return {
             ...scan,
-            findingsCount: findings?.length || 0
+            findingsCount: validFindings.length
           };
         })
       );
