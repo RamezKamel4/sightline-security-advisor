@@ -51,19 +51,28 @@ export interface ScanResult {
   cves?: any[];
 }
 
+export interface TargetInfo {
+  original: string;
+  normalized: string;
+  hosts_count: number | null;
+  target_type: string;
+  warnings: string[];
+}
+
 export interface ScanResponse {
   results: ScanResult[];
   nmap_cmd: string;
   nmap_output: string;
   host_info?: HostInfo | null;
+  target_info?: TargetInfo;
   error?: string;
 }
 
 export const executeScan = async (
-  target: string, 
-  scanDepth: DepthKey, 
+  target: string,
+  scanDepth: DepthKey,
   scanProfile: ProfileKey
-): Promise<{ results: ScanResult[], nmapCmd: string, nmapOutput: string, hostInfo?: HostInfo | null }> => {
+): Promise<{ results: ScanResult[], nmapCmd: string, nmapOutput: string, hostInfo?: HostInfo | null, targetInfo?: TargetInfo }> => {
   const depthArgs = scanDepthMapping[scanDepth] ?? scanDepthMapping['fast'];
   const profileArgs = scanProfilePorts[scanProfile] ?? scanProfilePorts['comprehensive'];
   const nmapArgs = `${depthArgs} ${profileArgs}`;
@@ -144,6 +153,7 @@ export const executeScan = async (
     results: scanData.results,
     nmapCmd: scanData.nmap_cmd,
     nmapOutput: scanData.nmap_output,
-    hostInfo: scanData.host_info
+    hostInfo: scanData.host_info,
+    targetInfo: scanData.target_info
   };
 };

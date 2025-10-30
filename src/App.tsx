@@ -14,6 +14,10 @@ import CVELookup from "./pages/CVELookup";
 import WorkflowGuide from "./pages/WorkflowGuide";
 import Users from "./pages/Users";
 import Analytics from "./pages/Analytics";
+import SetPassword from "./pages/SetPassword";
+import History from "./pages/History";
+import SettingsPage from "./pages/SettingsPage";
+import UserAnalytics from "./pages/UserAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +30,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/set-password" element={<SetPassword />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Index />
@@ -56,6 +61,27 @@ const App = () => (
               <ProtectedRoute>
                 <Layout activeView="">
                   <Analytics />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/history" element={
+              <ProtectedRoute>
+                <Layout activeView="history">
+                  <History />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Layout activeView="settings">
+                  <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Layout activeView="analytics">
+                  <UserAnalytics />
                 </Layout>
               </ProtectedRoute>
             } />

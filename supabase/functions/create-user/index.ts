@@ -54,32 +54,89 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get redirect URL for password setup
-    const redirectUrl = `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`;
+    // Check if user already exists in auth
+    const { data: existingAuthUsers } = await supabaseClient.auth.admin.listUsers();
+    const existingAuthUser = existingAuthUsers?.users?.find(u => u.email === email);
 
-    // Invite user - this sends an email with a link to set password
-    const { data: newUser, error: createError } = await supabaseClient.auth.admin.inviteUserByEmail(email, {
+    let newUser;
+    
+    if (existingAuthUser) {
+      // User already exists in auth, just use the existing user
+      console.log('User already exists in auth, reusing existing user:', existingAuthUser.id);
+      newUser = { user: existingAuthUser };
+    } else {
+      // Generate a temporary password
+      const tempPassword = crypto.randomUUID();
+
+      // Create user with temporary password
+      const { data: createdUser, error: createError } = await supabaseClient.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: false,
+      });
+
+      if (createError) {
+        throw createError;
+      }
+      
+      newUser = createdUser;
+    }
+
+    // Use the actual Lovable project URL for redirect
+    const redirectUrl = `https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com/set-password`;
+    
+    console.log('Redirect URL for password setup:', redirectUrl);
+    
+    // Use Supabase's built-in password recovery email (same as "Forgot Your Password")
+    // This will automatically send the recovery email using Supabase's email service
+    const { error: recoveryError } = await supabaseClient.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
 
-    if (createError) {
-      throw createError;
+    if (recoveryError) {
+      console.error('Error sending password recovery email:', recoveryError);
+      throw recoveryError;
     }
 
-    // Create user profile
-    const { error: profileError } = await supabaseClient
-      .from('users')
-      .insert({
-        user_id: newUser.user.id,
-        email,
-        name,
-        password_hash: 'managed_by_auth',
-      });
+    console.log('Password recovery email sent successfully via Supabase email service');
 
-    if (profileError) {
-      // If profile creation fails, delete the auth user
-      await supabaseClient.auth.admin.deleteUser(newUser.user.id);
-      throw profileError;
+    // Check if profile already exists for this email (orphaned record)
+    const { data: existingProfile } = await supabaseClient
+      .from('users')
+      .select('user_id')
+      .eq('email', email)
+      .single();
+
+    if (existingProfile) {
+      // Update existing profile with new auth user ID
+      const { error: updateError } = await supabaseClient
+        .from('users')
+        .update({
+          user_id: newUser.user.id,
+          name,
+          password_hash: 'managed_by_auth',
+        })
+        .eq('email', email);
+
+      if (updateError) {
+        await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+        throw updateError;
+      }
+    } else {
+      // Create new profile
+      const { error: profileError } = await supabaseClient
+        .from('users')
+        .insert({
+          user_id: newUser.user.id,
+          email,
+          name,
+          password_hash: 'managed_by_auth',
+        });
+
+      if (profileError) {
+        await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+        throw profileError;
+      }
     }
 
     // Assign roles if provided

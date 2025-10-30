@@ -112,6 +112,8 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
         print(f"🌐 Found {len(hosts_list)} host(s) in scan")
         
         # Process ALL hosts from the scan (important for subnet scans)
+        detected_os = "unknown"  # Track OS for CVE filtering
+        
         for host in hosts_list:
             host_data = nm[host]
             
@@ -130,7 +132,8 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                         }
                         for match in os_matches[:3]  # Top 3 matches
                     ]
-                    print(f"🎯 OS Detection: {os_matches[0].get('name')} ({os_matches[0].get('accuracy')}% accuracy)")
+                    detected_os = os_matches[0].get('name', 'unknown')
+                    print(f"🎯 OS Detection: {detected_os} ({os_matches[0].get('accuracy')}% accuracy)")
                 
                 # MAC Address
                 addresses = host_data.get('addresses', {})
@@ -224,9 +227,9 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 # CVE enrichment only for open ports with known services
                 if port_state == "open" and search_service_name.lower() != "unknown":
                     try:
-                        cves = fetch_cves_for_service(search_service_name, search_version)
+                        cves = fetch_cves_for_service(search_service_name, search_version, detected_os)
                         service_data["cves"] = cves
-                        print(f"📄 Found {len(cves)} CVEs for {search_service_name}")
+                        print(f"📄 Found {len(cves)} relevant CVEs for {search_service_name}")
                     except Exception as e:
                         print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
                         traceback.print_exc()
