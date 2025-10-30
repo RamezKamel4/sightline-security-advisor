@@ -24,7 +24,8 @@ else:
 EXCLUDED_KEYWORDS = [
     "router", "firmware", "tenda", "tp-link", "weblogic", "cisco", "d-link",
     "zyxel", "iot", "camera", "modem", "printer", "netgear", "linksys",
-    "buffalo", "asus router", "belkin", "huawei router"
+    "buffalo", "asus router", "belkin", "huawei router", "wireless router",
+    "broadband router", "access point", "wrt54g", "fritzbox router firmware"
 ]
 
 def filter_cves_by_os(os_name: str, cve_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -95,12 +96,13 @@ def filter_by_age_and_score(cve_results: List[Dict[str, Any]]) -> List[Dict[str,
         
         cvss_score = cve.get("cvss") or 0
         
-        # Keep CVEs from 2015 onwards with CVSS >= 5.0
-        if year >= 2015 and cvss_score >= 5.0:
+        # Keep CVEs from 2020 onwards with CVSS >= 6.0 (stricter filter)
+        # Older CVEs are less relevant for modern systems
+        if year >= 2020 and cvss_score >= 6.0:
             filtered.append(cve)
         elif year == 0 or cvss_score == 0:
-            # If we can't determine year or score, keep it (might be legitimate)
-            filtered.append(cve)
+            # If we can't determine year or score, be conservative and exclude
+            print(f"🚫 Excluded {cve_id} - unknown year or score")
     
     print(f"🔍 Age/Score filter: {len(cve_results)} → {len(filtered)} CVEs")
     return filtered
