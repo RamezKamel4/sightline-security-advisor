@@ -48,7 +48,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       .from('scheduled_scans')
       .insert({
         user_id: user.id,
-        target: scanData.target,  // Use original input
+        target: scanData.target,
         profile: scanData.scanProfile,
         frequency: scanData.schedule,
         scheduled_time: scheduledTime,
@@ -69,17 +69,10 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   // For "now" scans, create and execute immediately
   console.log('💾 Creating scan record in database...');
-  
-  // Store both original and normalized target
-  const userInputTarget = scanData.target;
-  let normalizedTarget = userInputTarget;
-  
   const { data: scan, error } = await supabase
     .from('scans')
     .insert({
       target: scanData.target,
-      user_input_target: userInputTarget,
-      normalized_target: normalizedTarget,
       profile: scanData.scanProfile,
       status: 'running',
       start_time: new Date().toISOString(),
@@ -104,11 +97,6 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
       scanData.scanProfile as 'web-apps' | 'databases' | 'remote-access' | 'comprehensive'
     );
     
-    // Extract target info from backend response if available
-    if (scanResponse.targetInfo) {
-      normalizedTarget = scanResponse.targetInfo.normalized;
-    }
-    
     // Update scan status to completed and store nmap command + host info
     console.log('💾 Updating scan status to completed...');
     console.log('📝 Command to be saved:', scanResponse.nmapCmd);
@@ -119,9 +107,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
         end_time: new Date().toISOString(),
         nmap_cmd: scanResponse.nmapCmd,
         nmap_output: scanResponse.nmapOutput,
-        host_info: scanResponse.hostInfo as any || null,
-        normalized_target: normalizedTarget,
-        estimated_hosts: scanResponse.targetInfo?.hosts_count || 1
+        host_info: scanResponse.hostInfo as any || null
       })
       .eq('scan_id', scan.scan_id);
 

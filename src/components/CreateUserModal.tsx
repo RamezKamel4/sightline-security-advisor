@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 const createUserSchema = z.object({
   email: z.string().trim().email('Invalid email address').max(255, 'Email must be less than 255 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(100, 'Password must be less than 100 characters'),
   name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
 });
 
@@ -25,6 +26,7 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
+    password: '',
     name: '',
   });
   const [roles, setRoles] = useState<string[]>([]);
@@ -56,10 +58,10 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
 
       toast({
         title: 'Success',
-        description: 'User invited successfully. They will receive an email to set their password.',
+        description: 'User created successfully',
       });
 
-      setFormData({ email: '', name: '' });
+      setFormData({ email: '', password: '', name: '' });
       setRoles([]);
       onOpenChange(false);
       onSuccess();
@@ -98,7 +100,7 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            The user will receive an email invitation with a link to set their own password.
+            Add a new user to the platform. They will receive an email to verify their account.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -127,6 +129,18 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
               {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Min. 6 characters"
+                maxLength={100}
+              />
+              {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+            </div>
+            <div className="grid gap-2">
               <Label>Roles</Label>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center space-x-2">
@@ -147,16 +161,6 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
                   />
                   <label htmlFor="consultant" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                     Consultant
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="user" 
-                    checked={roles.includes('user')}
-                    onCheckedChange={() => toggleRole('user')}
-                  />
-                  <label htmlFor="user" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    User
                   </label>
                 </div>
               </div>
