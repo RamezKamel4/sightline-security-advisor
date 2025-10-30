@@ -100,6 +100,10 @@ def filter_by_age_and_score(cve_results: List[Dict[str, Any]]) -> List[Dict[str,
         # Older CVEs are less relevant for modern systems
         if year >= 2020 and cvss_score >= 6.0:
             filtered.append(cve)
+        # Keep recent CVEs even without CVSS score (awaiting analysis)
+        elif year >= 2024 and cvss_score == 0:
+            print(f"⚠️ Including {cve_id} - recent CVE without score (awaiting analysis)")
+            filtered.append(cve)
         elif year == 0 or cvss_score == 0:
             # If we can't determine year or score, be conservative and exclude
             print(f"🚫 Excluded {cve_id} - unknown year or score")
@@ -142,9 +146,19 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
             print(f"⏭️ Skipping CVE lookup for generic service '{service_name}' without version")
             return []
         
-        # Construct search query
+        # Construct search query with product name extraction
+        search_query = ""
         if version and version != "unknown":
-            search_query = f"{service_name} {version}"
+            # Extract product name from version string for better CVE matching
+            # E.g., "FRITZ!Box http config" -> "FRITZ!Box"
+            if "FRITZ!Box" in version.upper():
+                search_query = "FRITZ!Box"
+            elif "nginx" in version.lower():
+                search_query = f"nginx {version}"
+            elif "apache" in version.lower():
+                search_query = f"apache {version}"
+            else:
+                search_query = f"{service_name} {version}"
         else:
             search_query = service_name
             
