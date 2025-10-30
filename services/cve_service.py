@@ -25,7 +25,9 @@ EXCLUDED_KEYWORDS = [
     "router", "firmware", "tenda", "tp-link", "weblogic", "cisco", "d-link",
     "zyxel", "iot", "camera", "modem", "printer", "netgear", "linksys",
     "buffalo", "asus router", "belkin", "huawei router", "wireless router",
-    "broadband router", "access point", "wrt54g", "fritzbox router firmware"
+    "broadband router", "access point", "wrt54g", "fritzbox router firmware",
+    "ac18", "ac15", "ac1200", "kernel 1.0", "kernel 2.0", "kernel 2.2",
+    "embedded device", "smart tv", "set-top box", "dvr"
 ]
 
 # Router vendor exclusion list for cross-contamination prevention
@@ -74,44 +76,54 @@ def detect_vendor(service_name: str, version: str) -> str:
 def filter_cves_by_vendor(cve_results: List[Dict[str, Any]], product_name: str) -> List[Dict[str, Any]]:
     """
     Filter CVEs to only include those matching the detected vendor/product.
+    For Generic products, still filter out known router vendors.
     """
-    if product_name == "Generic":
-        return cve_results
-    
     product = product_name.lower()
     filtered = []
     
     for cve in cve_results:
         text = (cve.get("title", "") + " " + cve.get("description", "")).lower()
-        if product.lower().split()[0] in text:  # Match first word of product (e.g., "AVM" or "FRITZ!Box")
-            filtered.append(cve)
-        # Include if no specific vendor mentioned (generic vulnerability)
-        elif not any(vendor in text for vendor in EXCLUDED_VENDORS + ["cisco", "zyxel"]):
-            filtered.append(cve)
+        
+        # For specific products, match the product name
+        if product_name != "Generic":
+            if product.lower().split()[0] in text:
+                filtered.append(cve)
+            # Include if no specific vendor mentioned (generic vulnerability)
+            elif not any(vendor in text for vendor in EXCLUDED_VENDORS + ["cisco", "zyxel"]):
+                filtered.append(cve)
+        # For Generic products, exclude all router vendors
+        else:
+            if not any(vendor in text for vendor in EXCLUDED_VENDORS + ["cisco", "zyxel", "router", "firmware"]):
+                filtered.append(cve)
     
     print(f"🔍 Vendor filter ({product_name}): {len(cve_results)} → {len(filtered)} CVEs")
     return filtered
 
 def exclude_unrelated_router_cves(cve_results: List[Dict[str, Any]], product_name: str) -> List[Dict[str, Any]]:
     """
-    Exclude CVEs from other router vendors when a specific vendor is detected.
+    Exclude CVEs from other router vendors.
+    For Generic products, exclude ALL router vendor CVEs.
     """
-    if product_name == "Generic":
-        return cve_results
-    
     product = product_name.lower()
     filtered = []
     
     for cve in cve_results:
         text = (cve.get("title", "") + " " + cve.get("description", "")).lower()
         
-        # If CVE mentions another vendor but not ours, exclude it
+        # Check for any router vendor mentions
         is_other_vendor = any(v in text for v in EXCLUDED_VENDORS + ["cisco", "zyxel"])
-        is_our_vendor = any(part in text for part in product.split())
         
-        if is_other_vendor and not is_our_vendor:
-            print(f"🚫 Excluded {cve['id']} - different vendor detected")
-            continue
+        if product_name == "Generic":
+            # For unknown products, exclude ALL router CVEs
+            if is_other_vendor:
+                print(f"🚫 Excluded {cve['id']} - router vendor detected for generic service")
+                continue
+        else:
+            # For specific products, only exclude if it's a different vendor
+            is_our_vendor = any(part in text for part in product.split())
+            if is_other_vendor and not is_our_vendor:
+                print(f"🚫 Excluded {cve['id']} - different vendor detected")
+                continue
         
         filtered.append(cve)
     
@@ -233,10 +245,15 @@ def fetch_cves_for_service(service_name: str, version: str, os_name: str = "unkn
         product = detect_vendor(service_name, version)
         print(f"🏷️ Detected vendor/product: {product}")
         
-        # Skip CVE lookup for generic services without version info
-        generic_services = ["upnp", "http-alt", "http-proxy", "https-alt", "ppp", "cslistener"]
-        if product == "Generic" and service_name.lower() in generic_services and (not version or version == "unknown"):
-            print(f"⏭️ Skipping CVE lookup for generic service '{service_name}' without version")
+        # Skip CVE lookup for truly unknown services
+        generic_services = ["upnp", "http-alt", "http-proxy", "https-alt", "ppp", "cslistener", "unknown"]
+        if product == "Generic" and (not version or version == "unknown" or version == ""):
+            # If it's a completely unknown service, don't fetch CVEs
+            if service_name.lower() in generic_services or service_name.lower() == "unknown":
+                print(f"⏭️ Skipping CVE lookup for unknown service '{service_name}' without version")
+                return []
+            # Even if we have a service name, without version info, results will be too broad
+            print(f"⚠️ Generic service '{service_name}' without version - skipping to avoid irrelevant results")
             return []
         
         # Construct search query with vendor/product awareness
