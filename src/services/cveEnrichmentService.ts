@@ -54,32 +54,13 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
   // For each finding, query NVD API for CVEs
   for (const finding of findings) {
     try {
-      // Skip generic/non-specific services that won't have CVEs
-      const skipServices = ['http', 'https', 'http-alt', 'https-alt', 'http-proxy', 'cslistener', 'upnp', 'unknown'];
-      if (skipServices.includes(finding.service_name.toLowerCase())) {
-        console.log(`⏭️ Skipping generic service: ${finding.service_name}`);
-        continue;
-      }
+      console.log(`🔎 Querying NVD for: ${finding.service_name} ${finding.service_version || ''}`);
+      
+      // Build search query for NVD
+      const searchQuery = finding.service_version 
+        ? `${finding.service_name} ${finding.service_version}`
+        : finding.service_name;
 
-      // Skip if version is unknown and service is too generic
-      if (!finding.service_version || finding.service_version === 'unknown') {
-        console.log(`⏭️ Skipping ${finding.service_name} - no version information`);
-        continue;
-      }
-
-      console.log(`🔎 Querying NVD for: ${finding.service_name} ${finding.service_version}`);
-      
-      // Build specific search query for NVD - use just the product name without protocol
-      let searchQuery = finding.service_name;
-      
-      // Remove protocol prefixes for cleaner search
-      searchQuery = searchQuery.replace(/^(http|https|ssh|ftp|smtp|mysql|postgresql)\s+/i, '');
-      
-      // Add version to search
-      searchQuery = `${searchQuery} ${finding.service_version}`;
-      
-      console.log(`🔍 Searching NVD with: "${searchQuery}"`);
-      
       // Call nvd-proxy edge function with keywordSearch parameter
       const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
       

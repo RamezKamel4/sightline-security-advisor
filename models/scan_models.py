@@ -52,7 +52,6 @@ class ScanRequest(BaseModel):
             r'-T[0-5]',           # Timing template
             r'-p[\d,-]+',         # Port specification
             r'-sV',               # Service version detection
-            r'-sT',               # TCP connect scan
             r'-O',                # OS detection
             r'-A',                # Aggressive scan (OS, version, script, traceroute)
             r'-Pn',               # Skip host discovery

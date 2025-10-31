@@ -7,35 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 export const Settings = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [reportEmail, setReportEmail] = useState('admin@company.com');
   const [scanTimeout, setScanTimeout] = useState('60');
-  const [isResettingCVE, setIsResettingCVE] = useState(false);
-
-  const handleResetCVEEnrichment = async () => {
-    setIsResettingCVE(true);
-    try {
-      // Reset cve_enriched flag for all scans
-      const { error } = await supabase
-        .from('scans')
-        .update({ cve_enriched: false })
-        .eq('cve_enriched', true);
-
-      if (error) throw error;
-
-      toast.success('CVE enrichment reset successfully. Run new scans or view existing scans to re-enrich with CVE data.');
-    } catch (error) {
-      console.error('Error resetting CVE enrichment:', error);
-      toast.error('Failed to reset CVE enrichment');
-    } finally {
-      setIsResettingCVE(false);
-    }
-  };
 
   return (
     <>
@@ -186,37 +163,6 @@ export const Settings = () => {
                 </p>
                 <Button variant="destructive" size="sm">
                   Delete All Data
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>CVE Database</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label className="text-sm font-medium">CVE Enrichment Status</Label>
-                <p className="text-sm text-slate-600 mt-1">
-                  Scans are automatically enriched with CVE data from the National Vulnerability Database (NVD).
-                </p>
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label className="text-sm font-medium">Reset CVE Enrichment</Label>
-                <p className="text-sm text-slate-600 mt-1 mb-3">
-                  Reset all scans to re-fetch fresh CVE data from NVD. Use this if CVE data seems outdated or incomplete.
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleResetCVEEnrichment}
-                  disabled={isResettingCVE}
-                >
-                  {isResettingCVE ? 'Resetting...' : 'Reset CVE Data'}
                 </Button>
               </div>
             </CardContent>
