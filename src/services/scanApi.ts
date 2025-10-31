@@ -2,9 +2,9 @@ type DepthKey = 'fast' | 'deep' | 'aggressive';
 type ProfileKey = 'web-apps' | 'databases' | 'remote-access' | 'comprehensive';
 
 const scanDepthMapping: Record<DepthKey, string> = {
-  'fast': '-T4 -sV -Pn --version-intensity 5',
-  'deep': '-T4 -sV -Pn -O --version-intensity 7',
-  'aggressive': '-T4 -A -sV -Pn --version-intensity 9'
+  'fast': '-T4 -sV -Pn',
+  'deep': '-T4 -sV -Pn -O',
+  'aggressive': '-T4 -A -sV -Pn'
 };
 
 const scanProfilePorts: Record<ProfileKey, string> = {
