@@ -69,27 +69,57 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
 
       console.log(`🔎 Querying NVD for: ${finding.service_name} ${finding.service_version}`);
       
-      // Build specific search query for NVD
-      const searchQuery = `${finding.service_name} ${finding.service_version}`;
-
-      // Call nvd-proxy edge function with keywordSearch parameter
-      const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
+      // Extract product name from service_name
+      // Examples: "http Apache httpd" -> "Apache", "OpenSSH" -> "OpenSSH", "MySQL" -> "MySQL"
+      let productName = finding.service_name;
       
-      const response = await fetch(nvdUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Remove common protocol prefixes
+      productName = productName.replace(/^(http|https|ssh|ftp|smtp|mysql|postgresql)\s+/i, '');
+      
+      // Extract first word after protocol (usually the vendor/product name)
+      const words = productName.trim().split(/\s+/);
+      productName = words[0] || finding.service_name;
+      
+      // Build search queries to try (in order of priority)
+      const searchQueries = [
+        `${productName} ${finding.service_version}`, // e.g., "Apache 2.4.62"
+        `${finding.service_name} ${finding.service_version}`, // e.g., "http Apache 2.4.62"
+      ];
+      
+      let vulnerabilities: any[] = [];
+      let successfulQuery = '';
+      
+      // Try each search query until we get results
+      for (const searchQuery of searchQueries) {
+        console.log(`🔍 Trying search: "${searchQuery}"`);
+        
+        const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
+        
+        const response = await fetch(nvdUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!response.ok) {
-        console.warn(`⚠️ NVD lookup failed for ${finding.service_name}: ${response.status}`);
-        continue;
+        if (!response.ok) {
+          console.warn(`⚠️ NVD lookup failed for "${searchQuery}": ${response.status}`);
+          continue;
+        }
+
+        const nvdData = await response.json();
+        vulnerabilities = nvdData.vulnerabilities || [];
+        
+        if (vulnerabilities.length > 0) {
+          successfulQuery = searchQuery;
+          console.log(`✅ Found ${vulnerabilities.length} CVEs with query: "${searchQuery}"`);
+          break;
+        }
+        
+        // Small delay between attempts
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-
-      const nvdData = await response.json();
-      const vulnerabilities = nvdData.vulnerabilities || [];
 
       console.log(`✅ Found ${vulnerabilities.length} CVEs for ${finding.service_name}`);
 
