@@ -7,12 +7,44 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { RefreshCw } from 'lucide-react';
 
 export const Settings = () => {
+  const { toast } = useToast();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [reportEmail, setReportEmail] = useState('admin@company.com');
   const [scanTimeout, setScanTimeout] = useState('60');
+  const [isResettingCVE, setIsResettingCVE] = useState(false);
+
+  const handleResetCVEEnrichment = async () => {
+    setIsResettingCVE(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-cve-enrichment', {
+        method: 'POST',
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "CVE Enrichment Reset Complete",
+        description: data.message || "All scans will be re-enriched with CVE data when viewed.",
+      });
+
+      console.log('CVE Reset Results:', data);
+    } catch (error) {
+      console.error('Error resetting CVE enrichment:', error);
+      toast({
+        title: "Reset Failed",
+        description: "Failed to reset CVE enrichment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingCVE(false);
+    }
+  };
 
   return (
     <>
@@ -126,6 +158,38 @@ export const Settings = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Maintenance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label className="text-sm font-medium">CVE Enrichment Reset</Label>
+                <p className="text-sm text-slate-600 mt-1 mb-3">
+                  Reset all CVE enrichment flags to restore deleted CVE associations. This will trigger re-enrichment for all scans when they are viewed.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleResetCVEEnrichment}
+                  disabled={isResettingCVE}
+                >
+                  {isResettingCVE ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Reset CVE Enrichment
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>

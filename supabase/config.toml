@@ -9,5 +9,8 @@ verify_jwt = true
 [functions.nvd-proxy]
 verify_jwt = true
 
+[functions.reset-cve-enrichment]
+verify_jwt = false
+
 [functions.run-scheduled-scans]
 verify_jwt = false
