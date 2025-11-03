@@ -75,6 +75,14 @@ export const searchByCveId = async (cveId: string): Promise<NVDResponse> => {
   try {
     console.log('🔍 Starting CVE ID search for:', cveId);
     
+    // Normalize CVE ID by replacing Unicode dashes with standard ASCII hyphens
+    // This handles copy-paste from formatted documents that use special dash characters
+    const normalizedCveId = cveId
+      .trim()
+      .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-'); // Replace various Unicode dashes
+    
+    console.log('📝 Normalized CVE ID:', normalizedCveId);
+    
     // Get session for authorization
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
@@ -89,11 +97,11 @@ export const searchByCveId = async (cveId: string): Promise<NVDResponse> => {
     }
 
     console.log('✅ Session valid, user authenticated');
-    console.log('📡 Calling nvd-proxy edge function with CVE ID:', cveId);
+    console.log('📡 Calling nvd-proxy edge function with CVE ID:', normalizedCveId);
 
     // Call nvd-proxy edge function with cveId parameter
     const { data, error } = await supabase.functions.invoke('nvd-proxy', {
-      body: { cveId: cveId.trim() }
+      body: { cveId: normalizedCveId }
     });
 
     if (error) {
