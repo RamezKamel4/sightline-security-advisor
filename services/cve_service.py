@@ -2,7 +2,6 @@ import requests
 import traceback
 import os
 from typing import List, Dict, Any
-from datetime import datetime
 from supabase import create_client, Client
 
 # 🚀 Supabase connection - read from environment variables
@@ -81,7 +80,7 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
             if published_date:
                 year = int(published_date[:4])
             else:
-                year = datetime.now().year  # Use current year if not available
+                year = 2025  # Default to current year if not available
             
             # Get descriptions and normalized product info
             descriptions = cve_data.get("descriptions", [])
@@ -103,12 +102,28 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
                 for node in config.get("nodes", []):
                     for cpe_match in node.get("cpeMatch", []):
                         cpe_criteria = cpe_match.get("criteria", "").lower()
-                        if service_name.lower() in cpe_criteria:
+                        service_lower = service_name.lower()
+                        version_lower = version.lower()
+                        
+                        # More precise product name matching
+                        if f":{service_lower}:" in cpe_criteria:
                             has_product_match = True
-                            if version.lower() in cpe_criteria:
+                            
+                            # Strict version matching - must be exact
+                            if f":{service_lower}:{version_lower}" in cpe_criteria:
                                 has_version_match = True
                                 confidence = "high"
                                 break
+                                
+                            # Version range matching if available
+                            version_start = cpe_match.get("versionStartIncluding", "")
+                            version_end = cpe_match.get("versionEndIncluding", "")
+                            
+                            if version_start and version_end:
+                                if version_start <= version_lower <= version_end:
+                                    has_version_match = True
+                                    confidence = "high"
+                                    break
                     if has_version_match:
                         break
                 if has_version_match:
