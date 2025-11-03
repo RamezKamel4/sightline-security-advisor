@@ -2,6 +2,7 @@ import requests
 import traceback
 import os
 from typing import List, Dict, Any
+from datetime import datetime
 from supabase import create_client, Client
 
 # 🚀 Supabase connection - read from environment variables
@@ -33,34 +34,37 @@ def save_cves_to_supabase(cves: List[Dict[str, Any]]):
                 "cve_id": cve["id"],
                 "title": cve.get("title", cve["id"]),
                 "description": cve.get("description", "No description"),
-                "cvss_score": cve.get("cvss", None)
+                "cvss_score": cve.get("cvss", None),
+                "confidence": cve.get("confidence", "low"),
+                "published_year": cve.get("published_year", None)
             }, on_conflict=["cve_id"]).execute()
-            print(f"💾 Saved {cve['id']} into Supabase")
+            print(f"💾 Saved {cve['id']} into Supabase (confidence: {cve.get('confidence', 'low')})")
         except Exception as e:
             print(f"⚠️ Failed to save {cve['id']} - {e}")
 
 def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, Any]]:
     """
-    Fetch CVEs for a given service and version from NVD API,
-    then save them to Supabase.
+    Fetch and filter CVEs for a given service and version from NVD API,
+    with confidence scoring and version validation.
     """
     try:
+        # Skip lookup if version is unknown or empty
+        if not version or version.lower() == "unknown":
+            print(f"⚠️ Skipping CVE lookup for {service_name} - no version information")
+            return []
+
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
-        
-        # Construct search query
-        if version and version != "unknown":
-            search_query = f"{service_name} {version}"
-        else:
-            search_query = service_name
             
         # NVD API endpoint
         url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+        
+        # Use exact version matching in query
         params = {
-            "keywordSearch": search_query,
-            "resultsPerPage": 5  # limit results for now
+            "keywordSearch": f"{service_name} {version}",
+            "resultsPerPage": 10  # increased to get more potential matches
         }
         
-        print(f"🌐 Querying NVD API with: {search_query}")
+        print(f"🌐 Querying NVD API with: {service_name} {version}")
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         
@@ -72,18 +76,52 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
             cve_data = vuln.get("cve", {})
             cve_id = cve_data.get("id", "Unknown")
             
-            # Title or short description
-            title = cve_data.get("id", "Unknown CVE")
+            # Extract publication date for age filtering
+            published_date = cve_data.get("published", "")
+            if published_date:
+                year = int(published_date[:4])
+            else:
+                year = datetime.now().year  # Use current year if not available
             
-            # Get description
+            # Get descriptions and normalized product info
             descriptions = cve_data.get("descriptions", [])
             description = "No description available"
             for desc in descriptions:
                 if desc.get("lang") == "en":
                     description = desc.get("value", "No description available")
                     break
+                    
+            # Calculate confidence score based on matches
+            confidence = "low"
             
-            # Get severity (CVSS)
+            # Check configurations for exact product and version matches
+            configurations = cve_data.get("configurations", [])
+            has_product_match = False
+            has_version_match = False
+            
+            for config in configurations:
+                for node in config.get("nodes", []):
+                    for cpe_match in node.get("cpeMatch", []):
+                        cpe_criteria = cpe_match.get("criteria", "").lower()
+                        if service_name.lower() in cpe_criteria:
+                            has_product_match = True
+                            if version.lower() in cpe_criteria:
+                                has_version_match = True
+                                confidence = "high"
+                                break
+                    if has_version_match:
+                        break
+                if has_version_match:
+                    break
+            
+            if has_product_match and not has_version_match:
+                confidence = "medium"
+                
+            # Skip old CVEs if confidence is not high
+            if confidence != "high" and year < 2010:
+                continue
+            
+            # Get CVSS score
             metrics = cve_data.get("metrics", {})
             cvss = None
             if "cvssMetricV31" in metrics:
@@ -93,15 +131,23 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
             elif "cvssMetricV2" in metrics:
                 cvss = metrics["cvssMetricV2"][0].get("cvssData", {}).get("baseScore")
             
-            # Build CVE record
+            # Build enriched CVE record
             cves.append({
                 "id": cve_id,
-                "title": title,
+                "title": cve_data.get("id", "Unknown CVE"),
                 "description": description,
-                "cvss": cvss
+                "cvss": cvss,
+                "confidence": confidence,
+                "published_year": year
             })
         
-        print(f"✅ Found {len(cves)} CVEs for {service_name}")
+        # Sort by confidence and CVSS score
+        cves.sort(key=lambda x: (
+            {"high": 3, "medium": 2, "low": 1}[x["confidence"]], 
+            x.get("cvss", 0) or 0
+        ), reverse=True)
+        
+        print(f"✅ Found {len(cves)} relevant CVEs for {service_name} {version}")
 
         # 🚀 Save to Supabase
         if cves:

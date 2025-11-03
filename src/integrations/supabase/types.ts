@@ -16,21 +16,27 @@ export type Database = {
     Tables: {
       cve: {
         Row: {
+          confidence: string | null
           cve_id: string
           cvss_score: number | null
           description: string
+          published_year: number | null
           title: string
         }
         Insert: {
+          confidence?: string | null
           cve_id: string
           cvss_score?: number | null
           description: string
+          published_year?: number | null
           title: string
         }
         Update: {
+          confidence?: string | null
           cve_id?: string
           cvss_score?: number | null
           description?: string
+          published_year?: number | null
           title?: string
         }
         Relationships: []
