@@ -14,6 +14,65 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Compare semantic versions (e.g., "2.4.50" vs "2.4.26")
+ * Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+ */
+function compareVersions(v1: string, v2: string): number {
+  const parts1 = v1.split('.').map(p => parseInt(p) || 0);
+  const parts2 = v2.split('.').map(p => parseInt(p) || 0);
+  
+  const maxLength = Math.max(parts1.length, parts2.length);
+  
+  for (let i = 0; i < maxLength; i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    
+    if (p1 < p2) return -1;
+    if (p1 > p2) return 1;
+  }
+  
+  return 0;
+}
+
+/**
+ * Check if a version falls within a vulnerable range defined by CPE match criteria
+ */
+function isVersionVulnerable(
+  version: string,
+  versionStartIncluding?: string,
+  versionEndIncluding?: string,
+  versionStartExcluding?: string,
+  versionEndExcluding?: string
+): boolean {
+  // If no version constraints specified, consider it vulnerable (generic CPE match)
+  if (!versionStartIncluding && !versionEndIncluding && !versionStartExcluding && !versionEndExcluding) {
+    return true;
+  }
+  
+  // Check start range (inclusive)
+  if (versionStartIncluding && compareVersions(version, versionStartIncluding) < 0) {
+    return false;
+  }
+  
+  // Check start range (exclusive)
+  if (versionStartExcluding && compareVersions(version, versionStartExcluding) <= 0) {
+    return false;
+  }
+  
+  // Check end range (inclusive)
+  if (versionEndIncluding && compareVersions(version, versionEndIncluding) > 0) {
+    return false;
+  }
+  
+  // Check end range (exclusive)
+  if (versionEndExcluding && compareVersions(version, versionEndExcluding) >= 0) {
+    return false;
+  }
+  
+  return true;
+}
+
 async function fetchFromNVD(url: string, apiKey: string, attempt = 1): Promise<Response> {
   console.log(`Fetching from NVD (attempt ${attempt}/${MAX_RETRIES}): ${url}`);
   
@@ -123,16 +182,17 @@ serve(async (req) => {
       const serviceName = searchParts[0]?.toLowerCase();
       const version = searchParts.slice(1).join(' ').toLowerCase();
       
-      // Filter and score vulnerabilities
+      // Filter and score vulnerabilities with proper version range validation
       filteredVulnerabilities = filteredVulnerabilities.map((vuln: any) => {
         const cve = vuln.cve;
         const publishedDate = cve.published || '';
         const year = publishedDate ? parseInt(publishedDate.substring(0, 4)) : 2025;
         
-        // Calculate confidence score
+        // Calculate confidence score and validate version ranges
         let confidence = 'low';
         let hasProductMatch = false;
         let hasVersionMatch = false;
+        let isActuallyVulnerable = false;
         
         const configurations = cve.configurations || [];
         for (const config of configurations) {
@@ -144,40 +204,66 @@ serve(async (req) => {
               if (serviceName && cpeCriteria.includes(`:${serviceName}:`)) {
                 hasProductMatch = true;
                 
-                // Exact version matching
-                if (version && cpeCriteria.includes(`:${serviceName}:${version}`)) {
-                  hasVersionMatch = true;
-                  confidence = 'high';
-                  break;
-                }
-                
-                // Version range matching
-                const versionStart = cpeMatch.versionStartIncluding || '';
-                const versionEnd = cpeMatch.versionEndIncluding || '';
-                if (version && versionStart && versionEnd) {
-                  if (versionStart <= version && version <= versionEnd) {
+                if (version) {
+                  // Check if version is actually vulnerable using range validation
+                  const versionStartIncluding = cpeMatch.versionStartIncluding;
+                  const versionEndIncluding = cpeMatch.versionEndIncluding;
+                  const versionStartExcluding = cpeMatch.versionStartExcluding;
+                  const versionEndExcluding = cpeMatch.versionEndExcluding;
+                  
+                  const vulnerable = isVersionVulnerable(
+                    version,
+                    versionStartIncluding,
+                    versionEndIncluding,
+                    versionStartExcluding,
+                    versionEndExcluding
+                  );
+                  
+                  if (vulnerable) {
                     hasVersionMatch = true;
+                    isActuallyVulnerable = true;
                     confidence = 'high';
+                    console.log(`✅ Version ${version} IS vulnerable to ${cve.id} (range validated)`);
+                    break;
+                  } else {
+                    console.log(`❌ Version ${version} NOT vulnerable to ${cve.id} (outside range)`);
+                  }
+                  
+                  // Also check exact version match in CPE
+                  if (cpeCriteria.includes(`:${serviceName}:${version}`)) {
+                    hasVersionMatch = true;
+                    isActuallyVulnerable = true;
+                    confidence = 'high';
+                    console.log(`✅ Version ${version} IS vulnerable to ${cve.id} (exact CPE match)`);
                     break;
                   }
                 }
               }
             }
-            if (hasVersionMatch) break;
+            if (hasVersionMatch && isActuallyVulnerable) break;
           }
-          if (hasVersionMatch) break;
+          if (hasVersionMatch && isActuallyVulnerable) break;
         }
         
         if (hasProductMatch && !hasVersionMatch) {
           confidence = 'medium';
         }
         
-        return { ...vuln, _confidence: confidence, _year: year };
+        return { 
+          ...vuln, 
+          _confidence: confidence, 
+          _year: year,
+          _isActuallyVulnerable: isActuallyVulnerable
+        };
       });
       
-      // Filter out old low-confidence CVEs
+      // Filter out CVEs that don't match version ranges and old low-confidence CVEs
       filteredVulnerabilities = filteredVulnerabilities.filter((vuln: any) => {
-        if (vuln._confidence === 'high') return true;
+        // For high confidence matches, only keep if version is actually vulnerable
+        if (vuln._confidence === 'high') {
+          return vuln._isActuallyVulnerable === true;
+        }
+        // For lower confidence, filter by year
         return vuln._year >= 2010;
       });
       
