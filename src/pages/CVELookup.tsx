@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Search, Sparkles } from 'lucide-react';
 import { searchByServiceName, searchByCveId, NVDResponse } from '@/services/nvdService';
 import { useToast } from '@/hooks/use-toast';
-import { chatWithGemini } from '@/services/geminiService';
+import { analyzeCVE } from '@/services/geminiService';
 import {
   Select,
   SelectContent,
@@ -144,33 +144,14 @@ const CVELookup = () => {
   const handleAiAnalysis = async (cveId: string, description: string, cvssScore?: number) => {
     setAnalyzingCve(cveId);
     
-    const prompt = `You are a cybersecurity expert explaining to a non-technical user. Analyze this vulnerability:
-
-CVE ID: ${cveId}
-Description: ${description}
-${cvssScore ? `CVSS Score: ${cvssScore}` : ''}
-
-IMPORTANT: Use plain, everyday language. Avoid technical jargon. Explain like you're talking to someone who doesn't work in IT.
-
-Please provide:
-1. **What This Means**: Explain this vulnerability in simple, everyday language (2-3 sentences). Avoid technical terms.
-2. **Why This Matters**: What could realistically happen if this isn't fixed? Use real-world examples.
-3. **How to Fix It** (in simple steps anyone can follow):
-   - What to do first
-   - What needs to be updated or changed (in plain language)
-   - How urgent this is (Critical/High/Medium/Low)
-   - How to verify it's fixed
-
-Use simple words. No technical jargon. Be clear and practical.`;
-
     try {
-      const response = await chatWithGemini(prompt);
+      const response = await analyzeCVE(cveId, description, cvssScore);
       
       if (response.success && response.response) {
         setAiAnalysis(prev => ({ ...prev, [cveId]: response.response }));
         toast({
           title: "AI Analysis Complete",
-          description: "Gemini has analyzed the vulnerability",
+          description: "Vulnerability analyzed successfully",
         });
       } else {
         throw new Error(response.error || 'Failed to get AI analysis');

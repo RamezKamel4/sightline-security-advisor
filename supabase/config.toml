@@ -1,5 +1,8 @@
 project_id = "bliwnrikjfzcialoznur"
 
+[functions.cve-analysis]
+verify_jwt = true
+
 [functions.generate-report]
 verify_jwt = false
 

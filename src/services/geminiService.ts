@@ -43,3 +43,49 @@ export const chatWithGemini = async (message: string): Promise<GeminiResponse> =
     };
   }
 };
+
+export const analyzeCVE = async (cveId: string, description: string, cvssScore?: number): Promise<GeminiResponse> => {
+  try {
+    console.log('🔍 Analyzing CVE with Lovable AI:', cveId);
+    
+    const { data, error } = await supabase.functions.invoke('cve-analysis', {
+      body: { cveId, description, cvssScore }
+    });
+
+    if (error) {
+      console.error('❌ Edge function error:', error);
+      
+      // Handle rate limit errors specifically
+      if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
+      
+      if (error.message?.includes('402')) {
+        throw new Error('AI analysis credits exhausted. Please contact support.');
+      }
+      
+      throw new Error(error.message || 'Failed to analyze CVE');
+    }
+
+    if (data?.error) {
+      console.error('❌ AI analysis error:', data.error);
+      throw new Error(data.error);
+    }
+
+    console.log('✅ CVE analysis completed successfully');
+    return data;
+
+  } catch (error) {
+    console.error('💥 CVE analysis service error:', error);
+    
+    const friendlyMessage = error instanceof Error 
+      ? error.message 
+      : 'An unexpected error occurred while analyzing the vulnerability';
+    
+    return {
+      success: false,
+      response: '',
+      error: friendlyMessage
+    };
+  }
+};
