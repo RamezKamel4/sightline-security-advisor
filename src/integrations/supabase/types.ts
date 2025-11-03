@@ -56,6 +56,7 @@ export type Database = {
           service_name: string
           service_version: string | null
           state: string | null
+          status: string | null
           tls_info: Json | null
         }
         Insert: {
@@ -72,6 +73,7 @@ export type Database = {
           service_name: string
           service_version?: string | null
           state?: string | null
+          status?: string | null
           tls_info?: Json | null
         }
         Update: {
@@ -88,6 +90,7 @@ export type Database = {
           service_name?: string
           service_version?: string | null
           state?: string | null
+          status?: string | null
           tls_info?: Json | null
         }
         Relationships: [
