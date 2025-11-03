@@ -110,8 +110,102 @@ serve(async (req) => {
     const data = await nvdResponse.json();
     console.log(`Successfully fetched data from NVD. Vulnerabilities found: ${data.vulnerabilities?.length || 0}`);
 
+    // Apply smart filtering to reduce irrelevant results
+    let filteredVulnerabilities = data.vulnerabilities || [];
+    
+    // Skip filtering if keyword search contains "unknown" version
+    if (keywordSearch && keywordSearch.toLowerCase().includes(' unknown')) {
+      console.log('⚠️ Skipping results - query contains "unknown" version');
+      filteredVulnerabilities = [];
+    } else if (filteredVulnerabilities.length > 0) {
+      // Extract service name and version from keywordSearch
+      const searchParts = keywordSearch?.split(' ') || [];
+      const serviceName = searchParts[0]?.toLowerCase();
+      const version = searchParts.slice(1).join(' ').toLowerCase();
+      
+      // Filter and score vulnerabilities
+      filteredVulnerabilities = filteredVulnerabilities.map((vuln: any) => {
+        const cve = vuln.cve;
+        const publishedDate = cve.published || '';
+        const year = publishedDate ? parseInt(publishedDate.substring(0, 4)) : 2025;
+        
+        // Calculate confidence score
+        let confidence = 'low';
+        let hasProductMatch = false;
+        let hasVersionMatch = false;
+        
+        const configurations = cve.configurations || [];
+        for (const config of configurations) {
+          for (const node of config.nodes || []) {
+            for (const cpeMatch of node.cpeMatch || []) {
+              const cpeCriteria = (cpeMatch.criteria || '').toLowerCase();
+              
+              // Precise product matching
+              if (serviceName && cpeCriteria.includes(`:${serviceName}:`)) {
+                hasProductMatch = true;
+                
+                // Exact version matching
+                if (version && cpeCriteria.includes(`:${serviceName}:${version}`)) {
+                  hasVersionMatch = true;
+                  confidence = 'high';
+                  break;
+                }
+                
+                // Version range matching
+                const versionStart = cpeMatch.versionStartIncluding || '';
+                const versionEnd = cpeMatch.versionEndIncluding || '';
+                if (version && versionStart && versionEnd) {
+                  if (versionStart <= version && version <= versionEnd) {
+                    hasVersionMatch = true;
+                    confidence = 'high';
+                    break;
+                  }
+                }
+              }
+            }
+            if (hasVersionMatch) break;
+          }
+          if (hasVersionMatch) break;
+        }
+        
+        if (hasProductMatch && !hasVersionMatch) {
+          confidence = 'medium';
+        }
+        
+        return { ...vuln, _confidence: confidence, _year: year };
+      });
+      
+      // Filter out old low-confidence CVEs
+      filteredVulnerabilities = filteredVulnerabilities.filter((vuln: any) => {
+        if (vuln._confidence === 'high') return true;
+        return vuln._year >= 2010;
+      });
+      
+      // Sort by confidence and CVSS score
+      filteredVulnerabilities.sort((a: any, b: any) => {
+        const confidenceScore = { high: 3, medium: 2, low: 1 };
+        const aConfScore = confidenceScore[a._confidence as keyof typeof confidenceScore] || 0;
+        const bConfScore = confidenceScore[b._confidence as keyof typeof confidenceScore] || 0;
+        
+        if (aConfScore !== bConfScore) {
+          return bConfScore - aConfScore;
+        }
+        
+        const aCvss = a.cve?.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore ||
+                      a.cve?.metrics?.cvssMetricV30?.[0]?.cvssData?.baseScore ||
+                      a.cve?.metrics?.cvssMetricV2?.[0]?.cvssData?.baseScore || 0;
+        const bCvss = b.cve?.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore ||
+                      b.cve?.metrics?.cvssMetricV30?.[0]?.cvssData?.baseScore ||
+                      b.cve?.metrics?.cvssMetricV2?.[0]?.cvssData?.baseScore || 0;
+        
+        return bCvss - aCvss;
+      });
+      
+      console.log(`✅ Filtered to ${filteredVulnerabilities.length} relevant CVEs`);
+    }
+
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({ ...data, vulnerabilities: filteredVulnerabilities }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
