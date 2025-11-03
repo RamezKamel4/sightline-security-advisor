@@ -1,10 +1,22 @@
 
+"""
+Network Scanning Service with HTTP Verification and Gated CVE Lookup
+
+Gating Logic:
+1. Use Nmap -sV output first (may have version)
+2. If version missing/ambiguous, probe HTTP headers and TLS
+3. Only fetch CVEs when product + version are detected (high confidence)
+4. For product-only detection, mark as unconfirmed and provide recommendations
+5. Skip CVE lookup for unknown services to avoid false positives
+"""
+
 import nmap
 import traceback
 from fastapi import HTTPException
 from services.cve_service import fetch_cves_for_service
 from services.service_probe import probe_http_service, probe_banner, merge_detection_results
-from typing import List, Dict, Any
+from services.http_inspector import inspect_http_service, parse_server_header
+from typing import List, Dict, Any, Optional
 import re
 import socket
 import subprocess
@@ -184,27 +196,111 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
 
                 print(f"🔍 Port {port} ({port_state}): {service_name} - {display_version}")
 
-                # Enhanced service detection for HTTP/HTTPS services
+                # Enhanced service detection for HTTP/HTTPS services with gated CVE lookup
                 probe_data = {}
+                evidence = {}
+                final_product = None
+                final_version = None
+                status = "info"
+                recommendations = []
+                
                 if port_state == "open" and port in [80, 443, 8000, 8080, 8443, 3000, 5000, 9000]:
-                    print(f"🔬 Performing enhanced detection on {host}:{port}...")
+                    print(f"🔬 Performing HTTP verification on {host}:{port}...")
+                    
+                    # Determine hostname for proper Host header
+                    hostname = host
+                    if 'hostnames' in host_info and host_info['hostnames']:
+                        hostname = host_info['hostnames'][0]
+                    
+                    # Inspect HTTP service
+                    evidence = inspect_http_service(hostname, host, port)
+                    
+                    # Also run legacy probe for additional data
                     probe_data = probe_http_service(host, port)
                     
-                    # Merge nmap and probe results
-                    merged = merge_detection_results(service_name, display_version, probe_data)
+                    # Decision logic for product/version
+                    if evidence.get('product') and evidence.get('version'):
+                        # HIGH CONFIDENCE: Product + Version from HTTP headers
+                        final_product = evidence['product']
+                        final_version = evidence['version']
+                        search_service_name = final_product
+                        search_version = final_version
+                        display_version = f"{final_product} {final_version}"
+                        status = "vulnerable"  # Will be updated after CVE check
+                        print(f"✅ HIGH CONFIDENCE: {final_product} {final_version} (from HTTP headers)")
+                        
+                    elif evidence.get('product') and not evidence.get('version'):
+                        # MEDIUM CONFIDENCE: Product only, no version
+                        final_product = evidence['product']
+                        final_version = None
+                        # Check if nmap had version info
+                        if version_str and version_str.lower() != "unknown":
+                            final_version = version_str
+                            search_service_name = final_product
+                            search_version = final_version
+                            display_version = f"{final_product} {final_version} (nmap)"
+                            status = "vulnerable"
+                            print(f"✅ MEDIUM→HIGH: {final_product} {final_version} (product from headers, version from nmap)")
+                        else:
+                            search_service_name = final_product
+                            search_version = None  # Will gate CVE lookup
+                            display_version = f"{final_product} (version unknown)"
+                            status = "unconfirmed"
+                            recommendations.append(
+                                "Server header lacks version. CVE lookup skipped to avoid false positives. "
+                                "Consider authenticated scan or manual verification."
+                            )
+                            print(f"⚠️ MEDIUM CONFIDENCE: {final_product} but no version - CVE lookup will be skipped")
                     
-                    # Update display version based on merged results
-                    if merged.get('technologies'):
-                        tech_stack = []
-                        for tech in merged['technologies']:
-                            tech_name = f"{tech['name']} {tech.get('version', '')}".strip()
-                            tech_stack.append(f"{tech_name} ({tech['role']})")
-                        if tech_stack:
-                            display_version = " | ".join(tech_stack)
+                    elif product and version_str:
+                        # Fallback to nmap detection
+                        final_product = product
+                        final_version = version_str
+                        search_service_name = final_product
+                        search_version = final_version
+                        display_version = f"{product} {version_str}"
+                        status = "vulnerable"
+                        print(f"✅ Using nmap detection: {product} {version_str}")
                     
-                    print(f"✅ Enhanced detection complete. Confidence: {merged.get('confidence', 0):.1f}%")
-                    if merged.get('conflicts'):
-                        print(f"⚠️ Conflicts detected: {merged['conflicts']}")
+                    else:
+                        # NO PRODUCT/VERSION DETECTED
+                        search_service_name = service_name
+                        search_version = None  # Will gate CVE lookup
+                        display_version = "unknown"
+                        status = "info"
+                        recommendations.append(
+                            "Service detected but product/version could not be determined. "
+                            "CVE lookup skipped to prevent false positives."
+                        )
+                        print(f"⚠️ LOW CONFIDENCE: No product/version detected - CVE lookup will be skipped")
+                    
+                    # Add evidence-based recommendations
+                    if evidence.get('recommendations'):
+                        recommendations.extend(evidence['recommendations'])
+                    
+                    # Merge probe data for additional context
+                    if probe_data:
+                        merged = merge_detection_results(service_name, display_version, probe_data)
+                        if merged.get('conflicts'):
+                            print(f"⚠️ Conflicts detected: {merged['conflicts']}")
+                    
+                    print(f"📋 Final detection: product={final_product}, version={final_version}, status={status}")
+                
+                # Build detection methods list
+                detection_methods = probe_data.get('detection_methods', ['nmap']) if probe_data else ['nmap']
+                if evidence:
+                    if evidence.get('evidence_sources'):
+                        detection_methods.extend(evidence['evidence_sources'])
+                
+                # Build evidence dict for storage
+                evidence_data = {
+                    "sources": list(set(detection_methods)),
+                    "http_headers": evidence.get('http_headers', {}),
+                    "tls_info": evidence.get('tls_info', {}),
+                    "redirect_to_https": evidence.get('redirect_to_https', False),
+                    "confidence_level": evidence.get('confidence', 'low'),
+                    "recommendations": recommendations
+                }
                 
                 service_data = {
                     "host": host,
@@ -215,22 +311,50 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                     "cves": [],
                     "confidence": probe_data.get('confidence', 50.0) if probe_data else 50.0,
                     "raw_banner": probe_data.get('raw_banner', ''),
-                    "headers": probe_data.get('headers', {}),
-                    "tls_info": probe_data.get('tls_info', {}),
+                    "headers": evidence.get('http_headers', probe_data.get('headers', {})),
+                    "tls_info": evidence.get('tls_info', probe_data.get('tls_info', {})),
                     "proxy_detection": probe_data.get('proxy_detection', {}),
-                    "detection_methods": probe_data.get('detection_methods', ['nmap'])
+                    "detection_methods": evidence_data,
+                    "status": status,
+                    "recommendations": recommendations
                 }
 
-                # CVE enrichment only for open ports with known services
+                # GATED CVE ENRICHMENT
+                # Only fetch CVEs when we have high confidence (product + version)
                 if port_state == "open" and search_service_name.lower() != "unknown":
-                    try:
-                        cves = fetch_cves_for_service(search_service_name, search_version)
-                        service_data["cves"] = cves
-                        print(f"📄 Found {len(cves)} CVEs for {search_service_name}")
-                    except Exception as e:
-                        print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
-                        traceback.print_exc()
-                        service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
+                    # Check if we have version info (gating condition)
+                    has_version = search_version and search_version.lower() != "unknown"
+                    
+                    if has_version:
+                        # HIGH CONFIDENCE: Fetch CVEs
+                        try:
+                            print(f"🔓 GATED CVE LOOKUP: Fetching CVEs for {search_service_name} {search_version}")
+                            cves = fetch_cves_for_service(search_service_name, search_version, require_version=True)
+                            service_data["cves"] = cves
+                            
+                            if cves:
+                                # Check if any high-severity CVEs
+                                high_severity = any(cve.get('cvss', 0) and cve['cvss'] >= 7.0 for cve in cves)
+                                service_data["status"] = "vulnerable" if high_severity else "low_risk"
+                                print(f"📄 Found {len(cves)} CVEs for {search_service_name} {search_version}")
+                            else:
+                                service_data["status"] = "no_cves_found"
+                                print(f"✅ No CVEs found for {search_service_name} {search_version}")
+                        except Exception as e:
+                            print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
+                            traceback.print_exc()
+                            service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
+                    else:
+                        # NO VERSION: Skip CVE lookup to avoid false positives
+                        print(f"🚫 GATED CVE LOOKUP: Skipping {search_service_name} - no version (avoiding false positives)")
+                        service_data["cves"] = []
+                        service_data["status"] = "unconfirmed"
+                        if "Server detected but version unknown" not in recommendations:
+                            service_data["recommendations"].append(
+                                f"Product '{search_service_name}' detected but version unknown. "
+                                "CVE lookup skipped to prevent false positives. "
+                                "Run authenticated scan or check server configuration for precise version."
+                            )
 
                 results.append(service_data)
 

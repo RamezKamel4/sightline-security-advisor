@@ -1,7 +1,8 @@
 import requests
 import traceback
 import os
-from typing import List, Dict, Any
+import time
+from typing import List, Dict, Any, Optional
 from supabase import create_client, Client
 
 # 🚀 Supabase connection - read from environment variables
@@ -41,16 +42,41 @@ def save_cves_to_supabase(cves: List[Dict[str, Any]]):
         except Exception as e:
             print(f"⚠️ Failed to save {cve['id']} - {e}")
 
-def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, Any]]:
+# In-memory cache for CVE results to respect NVD rate limits
+# Cache key: (service_name, version) -> (cves, timestamp)
+_cve_cache: Dict[tuple, tuple] = {}
+_cache_ttl = 3600  # 1 hour cache
+
+def fetch_cves_for_service(
+    service_name: str, 
+    version: Optional[str] = None,
+    require_version: bool = True
+) -> List[Dict[str, Any]]:
     """
     Fetch and filter CVEs for a given service and version from NVD API,
     with confidence scoring and version validation.
+    
+    Args:
+        service_name: Product name (e.g., "apache_httpd", "nginx")
+        version: Version string (can be None)
+        require_version: If True, skip lookup when version is missing (default: True)
+    
+    Returns:
+        List of CVE dictionaries with confidence scoring
     """
     try:
-        # Skip lookup if version is unknown or empty
-        if not version or version.lower() == "unknown":
-            print(f"⚠️ Skipping CVE lookup for {service_name} - no version information")
+        # Gating logic: skip lookup if version is unknown or empty and required
+        if require_version and (not version or version.lower() == "unknown"):
+            print(f"🚫 Gated CVE lookup: {service_name} has no version - skipping to avoid false positives")
             return []
+        
+        # Check cache first
+        cache_key = (service_name, version or "")
+        if cache_key in _cve_cache:
+            cached_cves, cached_time = _cve_cache[cache_key]
+            if time.time() - cached_time < _cache_ttl:
+                print(f"💾 Using cached CVE results for {service_name} {version}")
+                return cached_cves
 
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
             
@@ -167,6 +193,9 @@ def fetch_cves_for_service(service_name: str, version: str) -> List[Dict[str, An
         # 🚀 Save to Supabase
         if cves:
             save_cves_to_supabase(cves)
+        
+        # Cache results
+        _cve_cache[cache_key] = (cves, time.time())
         
         return cves
         
