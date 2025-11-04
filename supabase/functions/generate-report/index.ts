@@ -157,7 +157,12 @@ SCAN FINDINGS:
 ${findingsSummary}
 
 CVE PRIORITIZATION METHODOLOGY:
-VulnScan AI intelligently filters vulnerabilities to show only the top 3 most relevant, severe, and recent CVEs per service. Lower-risk or outdated vulnerabilities are omitted for clarity. The risk calculation considers both average and maximum CVSS scores across all detected CVEs. This prioritization ensures the report focuses on actionable, high-impact vulnerabilities.
+VulnScan AI applies intelligent filtering to show only the most relevant vulnerabilities per service:
+1. DEDUPLICATION: Each CVE appears only once per service (duplicate entries across ports are removed)
+2. OUTDATED FILTERING: CVEs older than 2015 are excluded unless they're critical (CVSS ≥ 9.0)
+3. FALSE POSITIVE ELIMINATION: Only CVEs that match the detected product/service name are included
+4. SEVERITY PRIORITIZATION: Top 3 CVEs ranked by CVSS score and recency
+This ensures the report focuses on actionable, high-impact vulnerabilities while omitting lower-risk, outdated, or irrelevant entries.
 
 CRITICAL INSTRUCTIONS:
 0. DO NOT include any preamble or introduction like "Okay, here's the client-ready security report..." - start DIRECTLY with the Executive Summary section
@@ -208,10 +213,12 @@ Order vulnerabilities by severity within each group.
 
 ## 4. CVE PRIORITIZATION & FILTERING
 Explain the CVE selection methodology:
-- VulnScan AI intelligently filters vulnerabilities to display only the top 3 most relevant, severe, and recent CVEs per service
-- Lower-risk, outdated, or less applicable vulnerabilities are omitted for brevity and clarity
-- Risk level calculation considers both average and maximum CVSS scores across all detected CVEs
-- This prioritization ensures security teams can focus on the most actionable and high-impact vulnerabilities
+- **Deduplication**: Each CVE appears only once per service (duplicates across ports removed)
+- **Outdated Filtering**: CVEs older than 2015 are excluded unless critical (CVSS ≥ 9.0)
+- **False Positive Elimination**: Only CVEs matching the detected product/service are included
+- **Severity Prioritization**: Top 3 most severe and recent CVEs per service are displayed
+- **Risk Calculation**: Both average and maximum CVSS scores are considered
+- This intelligent filtering ensures security teams focus on actionable, high-impact vulnerabilities while omitting lower-risk, outdated, or irrelevant entries
 
 ## 5. SCAN METHODOLOGY & LIMITATIONS
 Provide a brief technical explanation covering:
