@@ -95,14 +95,92 @@ def is_version_in_range(version: str, start: Optional[str], end: Optional[str]) 
     
     return True
 
+def prioritize_cves(
+    cves: List[Dict[str, Any]], 
+    detected_version: Optional[str] = None,
+    top_n: int = 3
+) -> Dict[str, Any]:
+    """
+    Intelligently filter and prioritize CVEs based on relevance, severity, and recency.
+    Returns top N CVEs plus summary metadata.
+    
+    Args:
+        cves: Full list of CVE dictionaries
+        detected_version: The detected service version (if known)
+        top_n: Number of top CVEs to return (default: 3)
+    
+    Returns:
+        Dictionary with 'top_cves', 'omitted_count', 'summary_note', and 'total_cves'
+    """
+    if not cves:
+        return {
+            "top_cves": [],
+            "omitted_count": 0,
+            "summary_note": None,
+            "total_cves": 0
+        }
+    
+    # Step 1: Filter by relevance (version-based)
+    relevant_cves = []
+    current_year = 2025
+    
+    for cve in cves:
+        # If version is known, keep CVEs with high confidence (version match)
+        if detected_version and detected_version.lower() != "unknown":
+            if cve.get("confidence") == "high":
+                relevant_cves.append(cve)
+        else:
+            # If version unknown, keep only:
+            # - CVEs published in last 2 years, OR
+            # - CVEs with CVSS >= 9.0 (critical)
+            published_year = cve.get("published_year", current_year)
+            cvss_score = cve.get("cvss") or 0
+            
+            if (current_year - published_year <= 2) or (cvss_score >= 9.0):
+                relevant_cves.append(cve)
+    
+    # If no relevant CVEs found, fall back to all CVEs
+    if not relevant_cves:
+        relevant_cves = cves
+    
+    # Step 2: Filter by severity (CVSS >= 5.0)
+    severe_cves = [cve for cve in relevant_cves if (cve.get("cvss") or 0) >= 5.0]
+    
+    # If no severe CVEs, keep all relevant ones
+    if not severe_cves:
+        severe_cves = relevant_cves
+    
+    # Step 3: Sort by CVSS score (descending), then by published year (descending)
+    sorted_cves = sorted(
+        severe_cves,
+        key=lambda c: (c.get("cvss") or 0, c.get("published_year", 0)),
+        reverse=True
+    )
+    
+    # Step 4: Select top N CVEs
+    top_cves = sorted_cves[:top_n]
+    omitted_count = len(sorted_cves) - len(top_cves)
+    
+    # Step 5: Generate summary note
+    summary_note = None
+    if omitted_count > 0:
+        summary_note = f"{omitted_count} additional lower-risk or outdated CVEs were omitted for brevity."
+    
+    return {
+        "top_cves": top_cves,
+        "omitted_count": omitted_count,
+        "summary_note": summary_note,
+        "total_cves": len(cves)
+    }
+
 def fetch_cves_for_service(
     service_name: str, 
     version: Optional[str] = None,
     require_version: bool = True
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Fetch and filter CVEs for a given service and version from NVD API,
-    with confidence scoring and version validation.
+    with confidence scoring, version validation, and intelligent prioritization.
     
     Args:
         service_name: Product name (e.g., "apache_httpd", "nginx")
@@ -110,7 +188,7 @@ def fetch_cves_for_service(
         require_version: If True, skip lookup when version is missing (default: True)
     
     Returns:
-        List of CVE dictionaries with confidence scoring
+        Dictionary with prioritized CVE data including top_cves, omitted_count, and summary_note
     """
     # Initialize variables at function start to avoid NameError
     matched_products = set()
@@ -120,15 +198,20 @@ def fetch_cves_for_service(
         # Gating logic: skip lookup if version is unknown or empty and required
         if require_version and (not version or version.lower() == "unknown"):
             print(f"🚫 Gated CVE lookup: {service_name} has no version - skipping to avoid false positives")
-            return []
+            return {
+                "top_cves": [],
+                "omitted_count": 0,
+                "summary_note": None,
+                "total_cves": 0
+            }
         
         # Check cache first
         cache_key = (service_name, version or "")
         if cache_key in _cve_cache:
-            cached_cves, cached_time = _cve_cache[cache_key]
+            cached_result, cached_time = _cve_cache[cache_key]
             if time.time() - cached_time < _cache_ttl:
                 print(f"💾 Using cached CVE results for {service_name} {version}")
-                return cached_cves
+                return cached_result
 
         print(f"🔎 Fetching CVEs for service: {service_name}, version: {version}")
             
@@ -320,18 +403,36 @@ def fetch_cves_for_service(
                 batch = cves[i:i + batch_size]
                 save_cves_to_supabase(batch)
         
-        # Cache results
-        _cve_cache[cache_key] = (cves, time.time())
+        # 🎯 Prioritize CVEs intelligently (top 3 most relevant)
+        prioritized_result = prioritize_cves(cves, version, top_n=3)
         
-        return cves
+        # Cache results (cache the full result with metadata)
+        _cve_cache[cache_key] = (prioritized_result, time.time())
+        
+        return prioritized_result
         
     except requests.exceptions.Timeout:
         print(f"⏰ Timeout fetching CVEs for {service_name}")
-        return []  # Return empty list instead of error object
+        return {
+            "top_cves": [],
+            "omitted_count": 0,
+            "summary_note": None,
+            "total_cves": 0
+        }
     except requests.exceptions.RequestException as e:
         print(f"❌ Network error fetching CVEs for {service_name}: {e}")
-        return []  # Return empty list instead of error object
+        return {
+            "top_cves": [],
+            "omitted_count": 0,
+            "summary_note": None,
+            "total_cves": 0
+        }
     except Exception as e:
         print(f"❌ Unexpected error fetching CVEs for {service_name}: {e}")
         traceback.print_exc()
-        return []  # Return empty list instead of error object
+        return {
+            "top_cves": [],
+            "omitted_count": 0,
+            "summary_note": None,
+            "total_cves": 0
+        }

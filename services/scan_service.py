@@ -329,14 +329,29 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                         # HIGH CONFIDENCE: Fetch CVEs
                         try:
                             print(f"🔓 GATED CVE LOOKUP: Fetching CVEs for {search_service_name} {search_version}")
-                            cves = fetch_cves_for_service(search_service_name, search_version, require_version=True)
-                            service_data["cves"] = cves
+                            cve_result = fetch_cves_for_service(search_service_name, search_version, require_version=True)
                             
-                            if cves:
-                                # Check if any high-severity CVEs
-                                high_severity = any(cve.get('cvss', 0) and cve['cvss'] >= 7.0 for cve in cves)
+                            # Extract prioritized CVE data
+                            top_cves = cve_result.get("top_cves", [])
+                            omitted_count = cve_result.get("omitted_count", 0)
+                            summary_note = cve_result.get("summary_note")
+                            total_cves = cve_result.get("total_cves", 0)
+                            
+                            # Store CVE data with metadata
+                            service_data["cves"] = top_cves
+                            service_data["cve_metadata"] = {
+                                "total_cves": total_cves,
+                                "omitted_count": omitted_count,
+                                "summary_note": summary_note
+                            }
+                            
+                            if top_cves:
+                                # Check if any high-severity CVEs in top results
+                                high_severity = any(cve.get('cvss', 0) and cve['cvss'] >= 7.0 for cve in top_cves)
                                 service_data["status"] = "vulnerable" if high_severity else "low_risk"
-                                print(f"📄 Found {len(cves)} CVEs for {search_service_name} {search_version}")
+                                print(f"📄 Found {total_cves} total CVEs (showing top {len(top_cves)}) for {search_service_name} {search_version}")
+                                if omitted_count > 0:
+                                    print(f"   ⚠️ {omitted_count} additional CVEs omitted for brevity")
                             else:
                                 service_data["status"] = "no_cves_found"
                                 print(f"✅ No CVEs found for {search_service_name} {search_version}")
@@ -344,6 +359,11 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                             print(f"⚠️ Error fetching CVEs for {search_service_name}: {e}")
                             traceback.print_exc()
                             service_data["cves"] = [{"error": f"Could not fetch CVEs: {e}"}]
+                            service_data["cve_metadata"] = {
+                                "total_cves": 0,
+                                "omitted_count": 0,
+                                "summary_note": None
+                            }
                     else:
                         # NO VERSION: Skip CVE lookup to avoid false positives
                         print(f"🚫 GATED CVE LOOKUP: Skipping {search_service_name} - no version (avoiding false positives)")
