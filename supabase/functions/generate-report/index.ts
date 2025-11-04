@@ -156,6 +156,9 @@ serve(async (req) => {
 SCAN FINDINGS:
 ${findingsSummary}
 
+CVE PRIORITIZATION METHODOLOGY:
+VulnScan AI intelligently filters vulnerabilities to show only the top 3 most relevant, severe, and recent CVEs per service. Lower-risk or outdated vulnerabilities are omitted for clarity. The risk calculation considers both average and maximum CVSS scores across all detected CVEs. This prioritization ensures the report focuses on actionable, high-impact vulnerabilities.
+
 CRITICAL INSTRUCTIONS:
 0. DO NOT include any preamble or introduction like "Okay, here's the client-ready security report..." - start DIRECTLY with the Executive Summary section
 1. For EACH finding above, you MUST generate a complete vulnerability entry in the report
@@ -203,13 +206,20 @@ Group all findings by severity:
 
 Order vulnerabilities by severity within each group.
 
-## 4. SCAN METHODOLOGY & LIMITATIONS
+## 4. CVE PRIORITIZATION & FILTERING
+Explain the CVE selection methodology:
+- VulnScan AI intelligently filters vulnerabilities to display only the top 3 most relevant, severe, and recent CVEs per service
+- Lower-risk, outdated, or less applicable vulnerabilities are omitted for brevity and clarity
+- Risk level calculation considers both average and maximum CVSS scores across all detected CVEs
+- This prioritization ensures security teams can focus on the most actionable and high-impact vulnerabilities
+
+## 5. SCAN METHODOLOGY & LIMITATIONS
 Provide a brief technical explanation covering:
 - Why some service banners appeared as "unknown" (Nmap version detection limitations, firewall filtering, IPS restrictions, or services configured to suppress banner information)
 - Why only certain ports were scanned (explain the scan profile used, e.g., web-apps profile focusing on web-related services, deliberately excluding system-level ports like SMB or NetBIOS)
 - How environmental restrictions and deliberate scan scope affected version detection capabilities
 
-## 5. TECHNICAL SUMMARY
+## 6. TECHNICAL SUMMARY
 Include technical details:
 - Open ports discovered
 - Service banners and versions detected

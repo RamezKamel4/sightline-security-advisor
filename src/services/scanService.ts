@@ -164,21 +164,49 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
   console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.host}:${r.port}/${r.service} (${r.state})`).join(', '));
   
-  const findingsToInsert = scanResults.map(result => ({
-    scan_id: scanId,
-    host: result.host,
-    port: result.port,
-    state: result.state,
-    service_name: result.service,
-    service_version: result.version || 'unknown',
-    cve_id: null,  // CVE enrichment will happen during report generation
-    confidence: (result as any).confidence || 0,
-    raw_banner: (result as any).raw_banner || null,
-    headers: (result as any).headers || null,
-    tls_info: (result as any).tls_info || null,
-    proxy_detection: (result as any).proxy_detection || null,
-    detection_methods: (result as any).detection_methods || null,
-  }));
+  const findingsToInsert = [];
+  
+  for (const result of scanResults) {
+    const cves = (result as any).cves || [];
+    
+    // If service has CVEs, create one finding per CVE (up to 3)
+    if (cves.length > 0) {
+      for (const cve of cves) {
+        findingsToInsert.push({
+          scan_id: scanId,
+          host: result.host,
+          port: result.port,
+          state: result.state,
+          service_name: result.service,
+          service_version: result.version || 'unknown',
+          cve_id: cve.id || null,
+          confidence: (result as any).confidence || 0,
+          raw_banner: (result as any).raw_banner || null,
+          headers: (result as any).headers || null,
+          tls_info: (result as any).tls_info || null,
+          proxy_detection: (result as any).proxy_detection || null,
+          detection_methods: (result as any).detection_methods || null,
+        });
+      }
+    } else {
+      // No CVEs - create a single finding without CVE
+      findingsToInsert.push({
+        scan_id: scanId,
+        host: result.host,
+        port: result.port,
+        state: result.state,
+        service_name: result.service,
+        service_version: result.version || 'unknown',
+        cve_id: null,
+        confidence: (result as any).confidence || 0,
+        raw_banner: (result as any).raw_banner || null,
+        headers: (result as any).headers || null,
+        tls_info: (result as any).tls_info || null,
+        proxy_detection: (result as any).proxy_detection || null,
+        detection_methods: (result as any).detection_methods || null,
+      });
+    }
+  }
 
   const { data, error: findingError } = await supabase
     .from('findings')
