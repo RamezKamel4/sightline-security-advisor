@@ -98,17 +98,15 @@ def is_version_in_range(version: str, start: Optional[str], end: Optional[str]) 
 def prioritize_cves(
     cves: List[Dict[str, Any]], 
     detected_version: Optional[str] = None,
-    service_name: Optional[str] = None,
     top_n: int = 3
 ) -> Dict[str, Any]:
     """
     Intelligently filter and prioritize CVEs based on relevance, severity, and recency.
-    Removes duplicates, outdated entries, and false positives.
+    Returns top N CVEs plus summary metadata.
     
     Args:
         cves: Full list of CVE dictionaries
         detected_version: The detected service version (if known)
-        service_name: The detected service name for false positive filtering
         top_n: Number of top CVEs to return (default: 3)
     
     Returns:
@@ -122,103 +120,57 @@ def prioritize_cves(
             "total_cves": 0
         }
     
+    # Step 1: Filter by relevance (version-based)
+    relevant_cves = []
     current_year = 2025
     
-    # Step 1: De-duplicate CVEs by ID
-    unique_cves = {}
     for cve in cves:
-        cve_id = cve.get("id")
-        if cve_id and cve_id not in unique_cves:
-            unique_cves[cve_id] = cve
-    
-    deduped_cves = list(unique_cves.values())
-    print(f"🔄 Removed {len(cves) - len(deduped_cves)} duplicate CVEs")
-    
-    # Step 2: Filter out outdated CVEs (older than 2015 unless critical)
-    filtered_by_age = []
-    for cve in deduped_cves:
-        published_year = cve.get("published_year", current_year)
-        cvss_score = cve.get("cvss") or 0
-        
-        # Keep if published after 2015 OR critical (CVSS >= 9.0)
-        if published_year >= 2015 or cvss_score >= 9.0:
-            filtered_by_age.append(cve)
-    
-    print(f"📅 Removed {len(deduped_cves) - len(filtered_by_age)} outdated CVEs (pre-2015, non-critical)")
-    
-    # Step 3: Filter false positives using product name validation
-    filtered_by_product = []
-    if service_name:
-        service_name_lower = service_name.lower()
-        
-        for cve in filtered_by_age:
-            description = (cve.get("description") or "").lower()
-            matched_products = cve.get("matched_products", [])
-            
-            # Keep CVE if:
-            # - Service name appears in description, OR
-            # - Service name is in matched_products list, OR
-            # - CVE has high confidence (already validated by version match)
-            if (service_name_lower in description or 
-                any(service_name_lower in str(p).lower() for p in matched_products) or
-                cve.get("confidence") == "high"):
-                filtered_by_product.append(cve)
-            else:
-                print(f"🚫 Filtered false positive: {cve.get('id')} (no product match for '{service_name}')")
-    else:
-        filtered_by_product = filtered_by_age
-    
-    print(f"🎯 Removed {len(filtered_by_age) - len(filtered_by_product)} false positives (no product match)")
-    
-    # Step 4: Filter by version relevance if version is known
-    relevant_cves = []
-    if detected_version and detected_version.lower() != "unknown":
-        # Prioritize high-confidence (version-matched) CVEs
-        for cve in filtered_by_product:
+        # If version is known, keep CVEs with high confidence (version match)
+        if detected_version and detected_version.lower() != "unknown":
             if cve.get("confidence") == "high":
                 relevant_cves.append(cve)
-    else:
-        # If version unknown, keep only recent (last 2 years) or critical (CVSS >= 9.0)
-        for cve in filtered_by_product:
+        else:
+            # If version unknown, keep only:
+            # - CVEs published in last 2 years, OR
+            # - CVEs with CVSS >= 9.0 (critical)
             published_year = cve.get("published_year", current_year)
             cvss_score = cve.get("cvss") or 0
             
             if (current_year - published_year <= 2) or (cvss_score >= 9.0):
                 relevant_cves.append(cve)
     
-    # If no relevant CVEs found after filtering, fall back to all filtered CVEs
+    # If no relevant CVEs found, fall back to all CVEs
     if not relevant_cves:
-        relevant_cves = filtered_by_product
+        relevant_cves = cves
     
-    # Step 5: Filter by severity (CVSS >= 5.0)
+    # Step 2: Filter by severity (CVSS >= 5.0)
     severe_cves = [cve for cve in relevant_cves if (cve.get("cvss") or 0) >= 5.0]
     
     # If no severe CVEs, keep all relevant ones
     if not severe_cves:
         severe_cves = relevant_cves
     
-    # Step 6: Sort by CVSS score (descending), then by published year (descending)
+    # Step 3: Sort by CVSS score (descending), then by published year (descending)
     sorted_cves = sorted(
         severe_cves,
         key=lambda c: (c.get("cvss") or 0, c.get("published_year", 0)),
         reverse=True
     )
     
-    # Step 7: Select top N CVEs
+    # Step 4: Select top N CVEs
     top_cves = sorted_cves[:top_n]
     omitted_count = len(sorted_cves) - len(top_cves)
     
-    # Step 8: Generate summary note
+    # Step 5: Generate summary note
     summary_note = None
     if omitted_count > 0:
-        summary_note = f"{omitted_count} older or lower-risk vulnerabilities omitted for clarity."
+        summary_note = f"{omitted_count} additional lower-risk or outdated CVEs were omitted for brevity."
     
     return {
         "top_cves": top_cves,
         "omitted_count": omitted_count,
         "summary_note": summary_note,
-        "total_cves": len(cves),
-        "filtered_total": len(sorted_cves)
+        "total_cves": len(cves)
     }
 
 def fetch_cves_for_service(
@@ -452,7 +404,7 @@ def fetch_cves_for_service(
                 save_cves_to_supabase(batch)
         
         # 🎯 Prioritize CVEs intelligently (top 3 most relevant)
-        prioritized_result = prioritize_cves(cves, version, service_name, top_n=3)
+        prioritized_result = prioritize_cves(cves, version, top_n=3)
         
         # Cache results (cache the full result with metadata)
         _cve_cache[cache_key] = (prioritized_result, time.time())

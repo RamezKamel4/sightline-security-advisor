@@ -156,14 +156,6 @@ serve(async (req) => {
 SCAN FINDINGS:
 ${findingsSummary}
 
-CVE PRIORITIZATION METHODOLOGY:
-VulnScan AI applies intelligent filtering to show only the most relevant vulnerabilities per service:
-1. DEDUPLICATION: Each CVE appears only once per service (duplicate entries across ports are removed)
-2. OUTDATED FILTERING: CVEs older than 2015 are excluded unless they're critical (CVSS ≥ 9.0)
-3. FALSE POSITIVE ELIMINATION: Only CVEs that match the detected product/service name are included
-4. SEVERITY PRIORITIZATION: Top 3 CVEs ranked by CVSS score and recency
-This ensures the report focuses on actionable, high-impact vulnerabilities while omitting lower-risk, outdated, or irrelevant entries.
-
 CRITICAL INSTRUCTIONS:
 0. DO NOT include any preamble or introduction like "Okay, here's the client-ready security report..." - start DIRECTLY with the Executive Summary section
 1. For EACH finding above, you MUST generate a complete vulnerability entry in the report
@@ -211,22 +203,13 @@ Group all findings by severity:
 
 Order vulnerabilities by severity within each group.
 
-## 4. CVE PRIORITIZATION & FILTERING
-Explain the CVE selection methodology:
-- **Deduplication**: Each CVE appears only once per service (duplicates across ports removed)
-- **Outdated Filtering**: CVEs older than 2015 are excluded unless critical (CVSS ≥ 9.0)
-- **False Positive Elimination**: Only CVEs matching the detected product/service are included
-- **Severity Prioritization**: Top 3 most severe and recent CVEs per service are displayed
-- **Risk Calculation**: Both average and maximum CVSS scores are considered
-- This intelligent filtering ensures security teams focus on actionable, high-impact vulnerabilities while omitting lower-risk, outdated, or irrelevant entries
-
-## 5. SCAN METHODOLOGY & LIMITATIONS
+## 4. SCAN METHODOLOGY & LIMITATIONS
 Provide a brief technical explanation covering:
 - Why some service banners appeared as "unknown" (Nmap version detection limitations, firewall filtering, IPS restrictions, or services configured to suppress banner information)
 - Why only certain ports were scanned (explain the scan profile used, e.g., web-apps profile focusing on web-related services, deliberately excluding system-level ports like SMB or NetBIOS)
 - How environmental restrictions and deliberate scan scope affected version detection capabilities
 
-## 6. TECHNICAL SUMMARY
+## 5. TECHNICAL SUMMARY
 Include technical details:
 - Open ports discovered
 - Service banners and versions detected

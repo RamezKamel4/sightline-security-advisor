@@ -518,21 +518,10 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-1">CVE Prioritization & Filtering</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-2">
-                    VulnScan AI intelligently filters vulnerabilities to show only the <strong>top 3 most relevant, severe, and recent CVEs</strong> per service.
-                  </p>
-                  <div className="text-sm text-slate-600 space-y-1">
-                    <p><strong>Filtering applied:</strong></p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li><strong>Duplicates removed</strong> - Each CVE appears only once per service</li>
-                      <li><strong>Outdated entries filtered</strong> - CVEs older than 2015 excluded (unless critical CVSS ≥ 9.0)</li>
-                      <li><strong>False positives eliminated</strong> - Only CVEs matching the detected product/version are included</li>
-                      <li><strong>Severity prioritization</strong> - Ranked by CVSS score and recency</li>
-                    </ul>
-                  </div>
-                  <p className="text-sm text-slate-500 italic mt-3">
-                    Lower-risk or outdated vulnerabilities are omitted for clarity. The risk calculation considers both average and maximum CVSS scores.
+                  <h4 className="text-sm font-semibold text-slate-900 mb-1">CVE Prioritization</h4>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    VulnScan AI intelligently filters vulnerabilities to show only the <strong>top 3 most relevant, severe, and recent CVEs</strong> per service. 
+                    Lower-risk or outdated vulnerabilities are omitted for clarity. The risk calculation considers both average and maximum CVSS scores across all detected CVEs.
                   </p>
                 </div>
               </div>
