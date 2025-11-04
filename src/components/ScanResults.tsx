@@ -507,26 +507,6 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               ))}
             </TableBody>
           </Table>
-          
-          {/* CVE Summary Information */}
-          {findings.some(f => f.cve_id) && (
-            <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-1">CVE Prioritization</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    VulnScan AI intelligently filters vulnerabilities to show only the <strong>top 3 most relevant, severe, and recent CVEs</strong> per service. 
-                    Lower-risk or outdated vulnerabilities are omitted for clarity. The risk calculation considers both average and maximum CVSS scores across all detected CVEs.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
