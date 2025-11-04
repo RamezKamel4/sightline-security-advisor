@@ -225,13 +225,33 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   const getRiskLevel = () => {
-    const criticalCVEs = findings.filter(f => f.cve_id).length;
-    const highScoreCVEs = findings.filter(f => f.cve?.cvss_score && f.cve.cvss_score >= 7.0).length;
+    const cveFindings = findings.filter(f => f.cve?.cvss_score);
     
-    if (highScoreCVEs > 3 || criticalCVEs > 5) return { level: 'High', color: 'bg-red-100 text-red-800' };
-    if (highScoreCVEs > 1 || criticalCVEs > 2) return { level: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
-    if (criticalCVEs > 0) return { level: 'Low', color: 'bg-orange-100 text-orange-800' };
-    return { level: 'Very Low', color: 'bg-green-100 text-green-800' };
+    // No CVEs found - Secure
+    if (cveFindings.length === 0) {
+      return { level: 'Secure', color: 'bg-green-100 text-green-800' };
+    }
+    
+    // Calculate average and max CVSS scores
+    const cvssScores = cveFindings.map(f => f.cve?.cvss_score || 0);
+    const avgCvss = cvssScores.reduce((sum, score) => sum + score, 0) / cvssScores.length;
+    const maxCvss = Math.max(...cvssScores);
+    
+    // Apply CVSS-based thresholds
+    if (maxCvss >= 9.0 || avgCvss >= 9.0) {
+      return { level: 'Critical', color: 'bg-purple-100 text-purple-800' };
+    }
+    if (avgCvss >= 7.0) {
+      return { level: 'High', color: 'bg-red-100 text-red-800' };
+    }
+    if (avgCvss >= 4.0) {
+      return { level: 'Medium', color: 'bg-yellow-100 text-yellow-800' };
+    }
+    if (avgCvss > 0.0) {
+      return { level: 'Low', color: 'bg-orange-100 text-orange-800' };
+    }
+    
+    return { level: 'Secure', color: 'bg-green-100 text-green-800' };
   };
 
   if (loading) {
@@ -314,7 +334,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-2">
-              <CheckCircle className={`h-5 w-5 ${risk.level === 'Very Low' ? 'text-green-500' : 'text-red-500'}`} />
+              <CheckCircle className={`h-5 w-5 ${risk.level === 'Secure' || risk.level === 'Low' ? 'text-green-500' : 'text-red-500'}`} />
               <div>
                 <p className="text-sm text-slate-600">Risk Level</p>
                 <Badge className={risk.color}>{risk.level}</Badge>
