@@ -11,6 +11,7 @@ app = FastAPI(title="VulnScan AI Backend", version="1.0.0")
 # Allowed origins for CORS - restrict to specific domains
 ALLOWED_ORIGINS = [
     "https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com",  # Production
+    "https://id-preview--2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovable.app",  # Preview
     "http://localhost:5173",  # Local development
     "http://localhost:3000",  # Alternative local port
 ]
