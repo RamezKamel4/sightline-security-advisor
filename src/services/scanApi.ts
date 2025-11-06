@@ -79,7 +79,11 @@ export const executeScan = async (
 
   console.log('Starting scan with args:', nmapArgs);
 
-  const backendUrl = 'http://localhost:8000/api/scan';
+  // Use environment variable or fallback to localhost
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+  const backendUrl = `${backendBaseUrl}/api/scan`;
+  
+  console.log('🔗 Connecting to backend:', backendUrl);
   
   const response = await fetch(backendUrl, {
     method: 'POST',
