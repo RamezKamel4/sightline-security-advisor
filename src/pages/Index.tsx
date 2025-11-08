@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
@@ -9,7 +9,9 @@ import { Settings } from '@/components/Settings';
 import { NewScanModal } from '@/components/NewScanModal';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState('dashboard');
+  const [searchParams] = useSearchParams();
+  const viewParam = searchParams.get('view') || 'dashboard';
+  const [activeView, setActiveView] = useState(viewParam);
   const [isNewScanOpen, setIsNewScanOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const { user } = useAuth();
@@ -20,6 +22,10 @@ const Index = () => {
       navigate('/auth');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    setActiveView(viewParam);
+  }, [viewParam]);
 
   const handleScanCreated = () => {
     setRefreshKey(prev => prev + 1);
