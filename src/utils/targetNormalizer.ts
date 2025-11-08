@@ -37,8 +37,9 @@ export const previewTargetNormalization = (input: string): NormalizedTarget => {
     return previewCIDR(trimmed);
   }
   
-  // Check for IP range
-  if (trimmed.includes('-')) {
+  // Check for IP range (e.g., 192.168.1.10-192.168.1.20 or 192.168.1.10-20)
+  // Only treat as range if it looks like an IP pattern (starts with digits)
+  if (trimmed.includes('-') && /^\d+\.\d+/.test(trimmed)) {
     return previewRange(trimmed);
   }
   

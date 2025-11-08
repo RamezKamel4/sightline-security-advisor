@@ -36,7 +36,8 @@ def normalize_target(user_input: str) -> Dict[str, any]:
         return _normalize_cidr(user_input)
     
     # Check if it's an IP range (e.g., 192.168.1.10-192.168.1.20 or 192.168.1.10-20)
-    if '-' in user_input:
+    # Only treat as range if it looks like an IP pattern (starts with digits)
+    if '-' in user_input and re.match(r'^\d+\.\d+', user_input):
         return _normalize_range(user_input)
     
     # Try to parse as IP address
