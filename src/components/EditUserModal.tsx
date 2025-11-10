@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 
 const editUserSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
@@ -17,7 +19,7 @@ interface User {
   id: string;
   email: string;
   roles: string[];
-  profile?: { name: string };
+  profile?: { name: string; consultant_id?: string };
 }
 
 interface EditUserModalProps {
@@ -32,12 +34,28 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
+  const [consultantId, setConsultantId] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch all consultants
+  const { data: consultants } = useQuery({
+    queryKey: ['consultants'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('user_id, users:user_id(user_id, email, name)')
+        .eq('role', 'consultant');
+      
+      if (error) throw error;
+      return data?.map(r => r.users).filter(Boolean) || [];
+    },
+  });
 
   useEffect(() => {
     if (user) {
       setName(user.profile?.name || '');
       setRoles(user.roles || []);
+      setConsultantId(user.profile?.consultant_id || '');
     }
   }, [user]);
 
@@ -63,6 +81,7 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
           userId: user.id,
           name: validatedData.name,
           roles,
+          consultantId: consultantId || null,
         },
       });
 
@@ -152,6 +171,25 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
                   </label>
                 </div>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consultant-select">Assign Consultant</Label>
+              <Select value={consultantId} onValueChange={setConsultantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a consultant" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {consultants?.map((consultant: any) => (
+                    <SelectItem key={consultant.user_id} value={consultant.user_id}>
+                      {consultant.name || consultant.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Consultants will review and approve AI-generated reports for this user
+              </p>
             </div>
           </div>
           <DialogFooter>

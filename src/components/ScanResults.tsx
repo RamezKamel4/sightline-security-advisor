@@ -299,7 +299,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               {isGeneratingReport ? 'Generating...' : 'Generate AI Report'}
             </Button>
           )}
-          {report && report.pdf_url && (
+          {report && report.pdf_url && report.status === 'approved' && (
             <Button variant="outline" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF

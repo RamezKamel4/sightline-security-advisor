@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,15 +9,85 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Save } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 
 export const Settings = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [reportEmail, setReportEmail] = useState('admin@company.com');
   const [scanTimeout, setScanTimeout] = useState('60');
   const [isResettingCVE, setIsResettingCVE] = useState(false);
+  const [consultantId, setConsultantId] = useState<string>('');
+  const [isSavingConsultant, setIsSavingConsultant] = useState(false);
+
+  // Fetch user's current consultant
+  const { data: userData } = useQuery({
+    queryKey: ['user-consultant', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('users')
+        .select('consultant_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Fetch all consultants
+  const { data: consultants } = useQuery({
+    queryKey: ['consultants'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('user_id, users:user_id(user_id, email, name)')
+        .eq('role', 'consultant');
+      
+      if (error) throw error;
+      return data?.map(r => r.users).filter(Boolean) || [];
+    },
+  });
+
+  useEffect(() => {
+    if (userData?.consultant_id) {
+      setConsultantId(userData.consultant_id);
+    }
+  }, [userData]);
+
+  const handleSaveConsultant = async () => {
+    if (!user) return;
+    
+    setIsSavingConsultant(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ consultant_id: consultantId || null })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings Saved",
+        description: "Your consultant preference has been updated.",
+      });
+    } catch (error) {
+      console.error('Error saving consultant:', error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save consultant preference. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingConsultant(false);
+    }
+  };
 
   const handleResetCVEEnrichment = async () => {
     setIsResettingCVE(true);
@@ -55,6 +125,50 @@ export const Settings = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Consultant Assignment</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label htmlFor="consultant">Your Assigned Consultant</Label>
+                <Select value={consultantId} onValueChange={setConsultantId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select a consultant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {consultants?.map((consultant: any) => (
+                      <SelectItem key={consultant.user_id} value={consultant.user_id}>
+                        {consultant.name || consultant.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your consultant will review and approve all AI-generated security reports
+                </p>
+              </div>
+              <Button 
+                onClick={handleSaveConsultant}
+                disabled={isSavingConsultant}
+                className="w-full"
+              >
+                {isSavingConsultant ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Consultant
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>

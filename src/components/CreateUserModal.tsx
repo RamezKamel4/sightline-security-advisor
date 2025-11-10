@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 
 const createUserSchema = z.object({
   email: z.string().trim().email('Invalid email address').max(255, 'Email must be less than 255 characters'),
@@ -28,7 +30,22 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
     name: '',
   });
   const [roles, setRoles] = useState<string[]>([]);
+  const [consultantId, setConsultantId] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Fetch all consultants
+  const { data: consultants } = useQuery({
+    queryKey: ['consultants'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('user_id, users:user_id(user_id, email, name)')
+        .eq('role', 'consultant');
+      
+      if (error) throw error;
+      return data?.map(r => r.users).filter(Boolean) || [];
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +66,7 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
         body: {
           ...validatedData,
           roles,
+          consultantId: consultantId || null,
         },
       });
 
@@ -61,6 +79,7 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
 
       setFormData({ email: '', name: '' });
       setRoles([]);
+      setConsultantId('');
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -160,6 +179,25 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
                   </label>
                 </div>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="consultant">Assign Consultant (Optional)</Label>
+              <Select value={consultantId} onValueChange={setConsultantId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a consultant" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {consultants?.map((consultant: any) => (
+                    <SelectItem key={consultant.user_id} value={consultant.user_id}>
+                      {consultant.name || consultant.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Consultants will review and approve AI-generated reports for this user
+              </p>
             </div>
           </div>
           <DialogFooter>

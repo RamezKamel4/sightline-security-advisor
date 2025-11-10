@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     // Get request body
-    const { userId, roles: newRoles, name } = await req.json();
+    const { userId, roles: newRoles, name, consultantId } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -53,11 +53,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update user profile name if provided
-    if (name) {
+    // Update user profile name and consultant if provided
+    const updates: any = {};
+    if (name) updates.name = name;
+    if (consultantId !== undefined) updates.consultant_id = consultantId || null;
+
+    if (Object.keys(updates).length > 0) {
       const { error: updateError } = await supabaseClient
         .from('users')
-        .update({ name })
+        .update(updates)
         .eq('user_id', userId);
 
       if (updateError) {

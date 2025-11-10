@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     // Get request body
-    const { email, name, roles: userRoles } = await req.json();
+    const { email, name, roles: userRoles, consultantId } = await req.json();
 
     // Validate input
     if (!email || !name) {
@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
           user_id: newUser.user.id,
           name,
           password_hash: 'managed_by_auth',
+          consultant_id: consultantId || null,
         })
         .eq('email', email);
 
@@ -133,6 +134,7 @@ Deno.serve(async (req) => {
           email,
           name,
           password_hash: 'managed_by_auth',
+          consultant_id: consultantId || null,
         });
 
       if (profileError) {
