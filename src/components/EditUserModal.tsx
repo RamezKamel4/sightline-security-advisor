@@ -174,12 +174,12 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
             </div>
             <div className="grid gap-2">
               <Label htmlFor="consultant-select">Assign Consultant</Label>
-              <Select value={consultantId} onValueChange={setConsultantId}>
+              <Select value={consultantId || 'none'} onValueChange={(value) => setConsultantId(value === 'none' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a consultant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {consultants?.map((consultant: any) => (
                     <SelectItem key={consultant.user_id} value={consultant.user_id}>
                       {consultant.name || consultant.email}

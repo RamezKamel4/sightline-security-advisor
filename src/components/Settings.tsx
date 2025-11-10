@@ -132,12 +132,12 @@ export const Settings = () => {
             <CardContent className="space-y-6">
               <div>
                 <Label htmlFor="consultant">Your Assigned Consultant</Label>
-                <Select value={consultantId} onValueChange={setConsultantId}>
+                <Select value={consultantId || 'none'} onValueChange={(value) => setConsultantId(value === 'none' ? '' : value)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select a consultant" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {consultants?.map((consultant: any) => (
                       <SelectItem key={consultant.user_id} value={consultant.user_id}>
                         {consultant.name || consultant.email}
