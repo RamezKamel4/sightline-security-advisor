@@ -1,5 +1,8 @@
 project_id = "bliwnrikjfzcialoznur"
 
+[functions.approve-report]
+verify_jwt = true
+
 [functions.cve-analysis]
 verify_jwt = true
 
@@ -9,7 +12,13 @@ verify_jwt = false
 [functions.gemini-chat]
 verify_jwt = true
 
+[functions.get-pending-reports]
+verify_jwt = true
+
 [functions.nvd-proxy]
+verify_jwt = true
+
+[functions.reject-report]
 verify_jwt = true
 
 [functions.reset-cve-enrichment]

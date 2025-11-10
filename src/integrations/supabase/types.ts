@@ -110,29 +110,76 @@ export type Database = {
           },
         ]
       }
+      report_audit_log: {
+        Row: {
+          action: string
+          id: string
+          notes: string | null
+          performed_by: string
+          report_id: string
+          timestamp: string
+        }
+        Insert: {
+          action: string
+          id?: string
+          notes?: string | null
+          performed_by: string
+          report_id: string
+          timestamp?: string
+        }
+        Update: {
+          action?: string
+          id?: string
+          notes?: string | null
+          performed_by?: string
+          report_id?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_audit_log_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["report_id"]
+          },
+        ]
+      }
       reports: {
         Row: {
+          consultant_id: string | null
           created_at: string
           fix_recommendations: string | null
           pdf_url: string | null
           report_id: string
+          review_notes: string | null
+          reviewed_at: string | null
           scan_id: string
+          status: Database["public"]["Enums"]["report_status"]
           summary: string | null
         }
         Insert: {
+          consultant_id?: string | null
           created_at?: string
           fix_recommendations?: string | null
           pdf_url?: string | null
           report_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
           scan_id: string
+          status?: Database["public"]["Enums"]["report_status"]
           summary?: string | null
         }
         Update: {
+          consultant_id?: string | null
           created_at?: string
           fix_recommendations?: string | null
           pdf_url?: string | null
           report_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
           scan_id?: string
+          status?: Database["public"]["Enums"]["report_status"]
           summary?: string | null
         }
         Relationships: [
@@ -267,6 +314,7 @@ export type Database = {
       }
       users: {
         Row: {
+          consultant_id: string | null
           created_at: string
           email: string
           name: string
@@ -274,6 +322,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          consultant_id?: string | null
           created_at?: string
           email: string
           name: string
@@ -281,6 +330,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          consultant_id?: string | null
           created_at?: string
           email?: string
           name?: string
@@ -319,6 +369,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user" | "consultant"
+      report_status: "pending_review" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -447,6 +498,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user", "consultant"],
+      report_status: ["pending_review", "approved", "rejected"],
     },
   },
 } as const

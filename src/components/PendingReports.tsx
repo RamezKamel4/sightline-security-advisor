@@ -1,0 +1,148 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Eye, CheckCircle, XCircle } from 'lucide-react';
+import { ReviewReportModal } from './ReviewReportModal';
+import { toast } from 'sonner';
+
+interface PendingReport {
+  report_id: string;
+  scan_id: string;
+  created_at: string;
+  summary: string;
+  pdf_url: string | null;
+  scans: {
+    scan_id: string;
+    target: string;
+    start_time: string;
+    user_id: string;
+    users: {
+      user_id: string;
+      name: string;
+      email: string;
+    };
+  };
+}
+
+export const PendingReports = () => {
+  const [selectedReport, setSelectedReport] = useState<PendingReport | null>(null);
+  const [modalAction, setModalAction] = useState<'approve' | 'reject' | null>(null);
+
+  const { data: reports, isLoading, refetch } = useQuery({
+    queryKey: ['pending-reports'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('get-pending-reports');
+      
+      if (error) throw error;
+      return data.reports as PendingReport[];
+    },
+  });
+
+  const handleOpenModal = (report: PendingReport, action: 'approve' | 'reject') => {
+    setSelectedReport(report);
+    setModalAction(action);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedReport(null);
+    setModalAction(null);
+  };
+
+  const handleSuccess = () => {
+    toast.success('Report review submitted successfully');
+    refetch();
+    handleCloseModal();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-3xl font-bold text-foreground">Pending Reports</h2>
+        <p className="text-muted-foreground mt-2">
+          Review and approve AI-generated security reports before they're visible to clients
+        </p>
+      </div>
+
+      {!reports || reports.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-lg text-muted-foreground">
+                No pending reports to review
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {reports.map((report) => (
+            <Card key={report.report_id} className="border-border">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1 flex-1">
+                    <CardTitle className="text-xl">
+                      Report for {report.scans.target}
+                    </CardTitle>
+                    <CardDescription>
+                      <div className="space-y-1">
+                        <p><strong>Client:</strong> {report.scans.users.name} ({report.scans.users.email})</p>
+                        <p><strong>Scan Date:</strong> {new Date(report.scans.start_time).toLocaleString()}</p>
+                        <p><strong>Generated:</strong> {new Date(report.created_at).toLocaleString()}</p>
+                      </div>
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="ml-4">
+                    Pending Review
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenModal(report, 'approve')}
+                    className="gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View & Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleOpenModal(report, 'reject')}
+                    className="gap-2"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Reject
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {selectedReport && modalAction && (
+        <ReviewReportModal
+          report={selectedReport}
+          action={modalAction}
+          onClose={handleCloseModal}
+          onSuccess={handleSuccess}
+        />
+      )}
+    </div>
+  );
+};

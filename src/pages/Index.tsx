@@ -7,6 +7,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { ScanHistory } from '@/components/ScanHistory';
 import { Settings } from '@/components/Settings';
 import { NewScanModal } from '@/components/NewScanModal';
+import { PendingReports } from '@/components/PendingReports';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
@@ -39,6 +40,8 @@ const Index = () => {
         return <ScanHistory key={refreshKey} />;
       case 'settings':
         return <Settings />;
+      case 'pending-reports':
+        return <PendingReports />;
       default:
         return <Dashboard onNewScan={() => setIsNewScanOpen(true)} />;
     }

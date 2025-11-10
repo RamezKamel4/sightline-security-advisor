@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info, Users, BarChart3 } from 'lucide-react';
+import { Shield, FileText, Settings as SettingsIcon, LogOut, Search, Info, Users, BarChart3, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { NavLink } from 'react-router-dom';
@@ -15,7 +15,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const { signOut, user } = useAuth();
-  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isAdmin, isConsultant, isLoading: roleLoading } = useUserRole();
   
   // Fetch scans this month
   const { data: scansThisMonth } = useQuery({
@@ -38,6 +38,10 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
     { id: 'dashboard', label: 'Dashboard', icon: Shield, path: '/?view=dashboard' },
     { id: 'history', label: 'Scan History', icon: FileText, path: '/?view=history' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/?view=settings' },
+  ];
+
+  const consultantMenuItems = [
+    { id: 'pending-reports', label: 'Pending Reports', icon: ClipboardCheck, path: '/?view=pending-reports' },
   ];
 
   const adminMenuItems = [
@@ -95,6 +99,38 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
             })}
           </ul>
         </div>
+
+        {(isConsultant || isAdmin) && !roleLoading && (
+          <div>
+            <div className="px-4 mb-2">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Consultant
+              </p>
+            </div>
+            <ul className="space-y-2">
+              {consultantMenuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.id}>
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) => 
+                        `w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                          activeView === item.id
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {isAdmin && !roleLoading && (
           <div>
