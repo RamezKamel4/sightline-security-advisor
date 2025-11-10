@@ -4,12 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { FileText, Download, AlertTriangle, CheckCircle, Monitor, Wifi, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { generateReport } from '@/services/reportService';
 import { enrichFindingsWithCVE } from '@/services/cveEnrichmentService';
 import type { HostInfo } from '@/services/scanApi';
+import { useQuery } from '@tanstack/react-query';
 
 interface ScanResultsProps {
   scanId: string;
@@ -55,7 +58,35 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const [loading, setLoading] = useState(true);
   const [isEnrichingCVE, setIsEnrichingCVE] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [selectedConsultant, setSelectedConsultant] = useState<string>('');
+  const [showConsultantSelect, setShowConsultantSelect] = useState(false);
   const { toast } = useToast();
+
+  // Fetch consultants and admins
+  const { data: consultants = [] } = useQuery({
+    queryKey: ['consultants'],
+    queryFn: async () => {
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['consultant', 'admin']);
+
+      if (rolesError) throw rolesError;
+
+      const userIds = rolesData.map(r => r.user_id);
+      
+      if (userIds.length === 0) return [];
+
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('user_id, email, name')
+        .in('user_id', userIds);
+
+      if (usersError) throw usersError;
+
+      return usersData || [];
+    },
+  });
 
   const toggleRowExpansion = (findingId: string) => {
     setExpandedRows(prev => {
@@ -179,10 +210,35 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   const handleGenerateReport = async () => {
+    if (!selectedConsultant) {
+      toast({
+        title: "Consultant Required",
+        description: "Please select a consultant before generating the report.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsGeneratingReport(true);
     try {
       await generateReport(scanId);
+      
+      // Update the report with selected consultant
+      const { data: reportData } = await supabase
+        .from('reports')
+        .select('report_id')
+        .eq('scan_id', scanId)
+        .single();
+
+      if (reportData) {
+        await supabase
+          .from('reports')
+          .update({ consultant_id: selectedConsultant })
+          .eq('report_id', reportData.report_id);
+      }
+
       await fetchReport();
+      setShowConsultantSelect(false);
       toast({
         title: "Report Generated",
         description: "AI-powered security report has been created successfully.",
@@ -289,17 +345,16 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
           <p className="text-slate-600">Findings for scan {scanId}</p>
         </div>
         <div className="flex space-x-2">
-          {!report && (
+          {!report && !showConsultantSelect && (
             <Button 
-              onClick={handleGenerateReport}
-              disabled={isGeneratingReport}
+              onClick={() => setShowConsultantSelect(true)}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <FileText className="h-4 w-4 mr-2" />
-              {isGeneratingReport ? 'Generating...' : 'Generate AI Report'}
+              Generate AI Report
             </Button>
           )}
-          {report && report.pdf_url && report.status === 'approved' && (
+          {report && report.pdf_url && (
             <Button variant="outline" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF
@@ -307,6 +362,48 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
           )}
         </div>
       </div>
+
+      {showConsultantSelect && !report && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Select Consultant for Report Review</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="consultant">Assign to Consultant</Label>
+              <Select value={selectedConsultant} onValueChange={setSelectedConsultant}>
+                <SelectTrigger id="consultant" className="bg-white">
+                  <SelectValue placeholder="Select a consultant" />
+                </SelectTrigger>
+                <SelectContent className="bg-white z-50">
+                  {consultants.map((consultant: any) => (
+                    <SelectItem key={consultant.user_id} value={consultant.user_id}>
+                      {consultant.name} ({consultant.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleGenerateReport}
+                disabled={isGeneratingReport || !selectedConsultant}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowConsultantSelect(false)}
+                disabled={isGeneratingReport}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
