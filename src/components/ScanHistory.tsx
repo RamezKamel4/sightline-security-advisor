@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Download, Search, Filter, Eye, Loader2 } from 'lucide-react';
+import { FileText, Download, Search, Filter, Eye, Loader2, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScanResults } from './ScanResults';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { generateReport } from '@/services/scanService';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Pagination, 
   PaginationContent, 
@@ -29,6 +30,10 @@ interface Scan {
   status: string | null;
   start_time: string | null;
   end_time: string | null;
+  reports?: {
+    report_id: string;
+    consultant_id: string | null;
+  }[];
 }
 
 export const ScanHistory = () => {
@@ -44,6 +49,30 @@ export const ScanHistory = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const { toast } = useToast();
 
+  // Fetch all consultants and admins
+  const { data: consultants } = useQuery({
+    queryKey: ['consultants-and-admins'],
+    queryFn: async () => {
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['consultant', 'admin']);
+      
+      if (roleError) throw roleError;
+      if (!roleData || roleData.length === 0) return [];
+      
+      const userIds = [...new Set(roleData.map(r => r.user_id))];
+      
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_id, email, name')
+        .in('user_id', userIds);
+      
+      if (userError) throw userError;
+      return userData || [];
+    },
+  });
+
   useEffect(() => {
     fetchScans();
   }, []);
@@ -52,11 +81,17 @@ export const ScanHistory = () => {
     try {
       const { data, error } = await supabase
         .from('scans')
-        .select('*')
+        .select(`
+          *,
+          reports (
+            report_id,
+            consultant_id
+          )
+        `)
         .order('start_time', { ascending: false });
 
       if (error) throw error;
-      setScans(data || []);
+      setScans((data as any) || []);
     } catch (error) {
       console.error('Error fetching scans:', error);
       toast({
@@ -108,6 +143,7 @@ export const ScanHistory = () => {
 
     setIsBulkGenerating(false);
     setSelectedScans(new Set());
+    await fetchScans(); // Refresh to show new reports
 
     if (successCount > 0) {
       toast({
@@ -118,6 +154,31 @@ export const ScanHistory = () => {
       toast({
         title: "Report Generation Failed",
         description: "Failed to generate any reports",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleConsultantChange = async (reportId: string, consultantId: string) => {
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .update({ consultant_id: consultantId === 'none' ? null : consultantId })
+        .eq('report_id', reportId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Consultant Updated",
+        description: "Report consultant has been updated successfully.",
+      });
+
+      await fetchScans(); // Refresh the data
+    } catch (error) {
+      console.error('Error updating consultant:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update consultant assignment.",
         variant: "destructive"
       });
     }
@@ -270,6 +331,7 @@ export const ScanHistory = () => {
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Duration</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate-600">Consultant</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Actions</th>
                 </tr>
               </thead>
@@ -297,6 +359,31 @@ export const ScanHistory = () => {
                     </td>
                     <td className="py-4 px-4 text-slate-600">
                       {formatDuration(scan.start_time, scan.end_time)}
+                    </td>
+                    <td className="py-4 px-4">
+                      {scan.reports && scan.reports.length > 0 ? (
+                        <Select 
+                          value={scan.reports[0].consultant_id || 'none'} 
+                          onValueChange={(value) => handleConsultantChange(scan.reports[0].report_id, value)}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select consultant" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {consultants?.map((consultant: any) => (
+                              <SelectItem key={consultant.user_id} value={consultant.user_id}>
+                                {consultant.name || consultant.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-slate-400 text-sm flex items-center gap-1">
+                          <UserCheck className="h-4 w-4" />
+                          No report
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex space-x-2">
