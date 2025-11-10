@@ -37,22 +37,26 @@ const CreateUserModal = ({ open, onOpenChange, onSuccess }: CreateUserModalProps
   const { data: consultants } = useQuery({
     queryKey: ['consultants-and-admins'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First, get all user_ids with consultant or admin roles
+      const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
-        .select('user_id, users!inner(user_id, email, name)')
+        .select('user_id')
         .in('role', ['consultant', 'admin']);
       
-      if (error) throw error;
+      if (roleError) throw roleError;
+      if (!roleData || roleData.length === 0) return [];
       
-      // Remove duplicates (users with both roles)
-      const uniqueUsers = new Map();
-      data?.forEach(r => {
-        if (r.users && !uniqueUsers.has(r.users.user_id)) {
-          uniqueUsers.set(r.users.user_id, r.users);
-        }
-      });
+      // Get unique user_ids
+      const userIds = [...new Set(roleData.map(r => r.user_id))];
       
-      return Array.from(uniqueUsers.values());
+      // Then fetch user details
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_id, email, name')
+        .in('user_id', userIds);
+      
+      if (userError) throw userError;
+      return userData || [];
     },
   });
 
