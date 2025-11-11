@@ -23,6 +23,7 @@ export const Settings = () => {
   const [isResettingCVE, setIsResettingCVE] = useState(false);
   const [consultantId, setConsultantId] = useState<string>('');
   const [isSavingConsultant, setIsSavingConsultant] = useState(false);
+  const [isSyncingProfiles, setIsSyncingProfiles] = useState(false);
 
   // Fetch user's current consultant
   const { data: userData } = useQuery({
@@ -126,6 +127,41 @@ export const Settings = () => {
       });
     } finally {
       setIsResettingCVE(false);
+    }
+  };
+
+  const handleSyncUserProfiles = async () => {
+    setIsSyncingProfiles(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
+
+      const { data, error } = await supabase.functions.invoke('sync-user-profiles', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "User Profiles Synced",
+        description: data.message || "User profiles have been synchronized successfully.",
+      });
+
+      console.log('Sync Results:', data);
+      
+      // Refresh consultants list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error syncing profiles:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync user profiles. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncingProfiles(false);
     }
   };
 
@@ -294,6 +330,33 @@ export const Settings = () => {
               <CardTitle>Database Maintenance</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div>
+                <Label className="text-sm font-medium">Sync User Profiles</Label>
+                <p className="text-sm text-slate-600 mt-1 mb-3">
+                  Sync missing user profiles from authentication to the users table. Run this if consultants aren't showing in dropdowns.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleSyncUserProfiles}
+                  disabled={isSyncingProfiles}
+                >
+                  {isSyncingProfiles ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync User Profiles
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              <Separator />
+              
               <div>
                 <Label className="text-sm font-medium">CVE Enrichment Reset</Label>
                 <p className="text-sm text-slate-600 mt-1 mb-3">

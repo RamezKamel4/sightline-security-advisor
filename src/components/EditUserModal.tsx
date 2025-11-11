@@ -38,28 +38,20 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Fetch all consultants and admins
-  const { data: consultants, error: consultantsError } = useQuery({
+  const { data: consultants } = useQuery({
     queryKey: ['consultants-and-admins'],
     queryFn: async () => {
-      console.log('Fetching consultants and admins...');
-      
       // First, get all user_ids with consultant or admin roles
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['consultant', 'admin']);
       
-      console.log('Role data:', roleData, 'Error:', roleError);
-      
       if (roleError) throw roleError;
-      if (!roleData || roleData.length === 0) {
-        console.log('No roles found');
-        return [];
-      }
+      if (!roleData || roleData.length === 0) return [];
       
       // Get unique user_ids
       const userIds = [...new Set(roleData.map(r => r.user_id))];
-      console.log('User IDs:', userIds);
       
       // Then fetch user details
       const { data: userData, error: userError } = await supabase
@@ -67,17 +59,10 @@ const EditUserModal = ({ open, onOpenChange, user, onSuccess }: EditUserModalPro
         .select('user_id, email, name')
         .in('user_id', userIds);
       
-      console.log('User data:', userData, 'Error:', userError);
-      
       if (userError) throw userError;
       return userData || [];
     },
   });
-
-  useEffect(() => {
-    console.log('Consultants data:', consultants);
-    console.log('Consultants error:', consultantsError);
-  }, [consultants, consultantsError]);
 
   useEffect(() => {
     if (user) {
