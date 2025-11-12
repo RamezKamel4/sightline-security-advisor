@@ -13,8 +13,8 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
@@ -22,23 +22,37 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
-    // Verify the user is authenticated and is an admin
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    // Create user-authenticated client to verify admin role
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    // Verify the user is authenticated
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
     
     if (userError || !user) {
+      console.error('Auth error:', userError);
       throw new Error('Unauthorized');
     }
 
-    // Check if user is admin
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
+    console.log('Authenticated user:', user.id);
 
-    if (rolesError || !roles?.some(r => r.role === 'admin')) {
+    // Check if user is admin using the has_role function
+    const { data: isAdmin, error: roleCheckError } = await userClient
+      .rpc('has_role', { _user_id: user.id, _role: 'admin' });
+
+    console.log('Admin check result:', isAdmin, roleCheckError);
+
+    if (roleCheckError || !isAdmin) {
       throw new Error('Unauthorized - Admin access required');
     }
+
+    // Now use service role client for admin operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get all auth users
     const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();

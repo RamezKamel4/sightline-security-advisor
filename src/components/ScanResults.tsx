@@ -63,15 +63,36 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const { toast } = useToast();
 
   // Fetch consultants and admins
-  const { data: consultants = [] } = useQuery({
+  const { data: consultants = [], error: consultantsError } = useQuery({
     queryKey: ['consultants'],
     queryFn: async () => {
       console.log('🔍 Fetching consultants...');
       
-      // First get user_ids with consultant or admin role
+      // Get all users and their roles in a single query
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          user_id,
+          email,
+          name
+        `);
+
+      if (error) {
+        console.error('❌ Error fetching users:', error);
+        throw error;
+      }
+
+      console.log('👥 All users:', data);
+
+      if (!data || data.length === 0) {
+        console.log('⚠️ No users found in users table');
+        return [];
+      }
+
+      // Get roles for these users
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id')
+        .select('user_id, role')
         .in('role', ['consultant', 'admin']);
 
       if (rolesError) {
@@ -80,30 +101,20 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
       }
 
       console.log('📋 Roles data:', rolesData);
-      const userIds = rolesData.map(r => r.user_id);
-      
-      if (userIds.length === 0) {
-        console.log('⚠️ No consultants or admins found in user_roles');
-        return [];
-      }
 
-      console.log('👥 User IDs to fetch:', userIds);
+      // Filter users who have consultant or admin role
+      const roleUserIds = new Set(rolesData?.map(r => r.user_id) || []);
+      const filteredUsers = data.filter(user => roleUserIds.has(user.user_id));
 
-      // Then get user details
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('user_id, email, name')
-        .in('user_id', userIds);
-
-      if (usersError) {
-        console.error('❌ Error fetching users:', usersError);
-        throw usersError;
-      }
-
-      console.log('✅ Users data fetched:', usersData);
-      return usersData || [];
+      console.log('✅ Filtered consultants/admins:', filteredUsers);
+      return filteredUsers;
     },
   });
+
+  // Log any errors
+  if (consultantsError) {
+    console.error('Consultants query error:', consultantsError);
+  }
 
   const toggleRowExpansion = (findingId: string) => {
     setExpandedRows(prev => {
