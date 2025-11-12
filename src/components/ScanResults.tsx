@@ -66,24 +66,41 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   const { data: consultants = [] } = useQuery({
     queryKey: ['consultants'],
     queryFn: async () => {
+      console.log('🔍 Fetching consultants...');
+      
+      // First get user_ids with consultant or admin role
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['consultant', 'admin']);
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error('❌ Error fetching roles:', rolesError);
+        throw rolesError;
+      }
 
+      console.log('📋 Roles data:', rolesData);
       const userIds = rolesData.map(r => r.user_id);
       
-      if (userIds.length === 0) return [];
+      if (userIds.length === 0) {
+        console.log('⚠️ No consultants or admins found in user_roles');
+        return [];
+      }
 
+      console.log('👥 User IDs to fetch:', userIds);
+
+      // Then get user details
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('user_id, email, name')
         .in('user_id', userIds);
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('❌ Error fetching users:', usersError);
+        throw usersError;
+      }
 
+      console.log('✅ Users data fetched:', usersData);
       return usersData || [];
     },
   });
