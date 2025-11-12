@@ -224,21 +224,18 @@ export const ScanHistory = () => {
       case 'approved':
         return (
           <Badge className="bg-green-100 text-green-800">
-            <CheckCircle className="h-3 w-3 mr-1" />
             Approved
           </Badge>
         );
       case 'rejected':
         return (
           <Badge className="bg-red-100 text-red-800">
-            <XCircle className="h-3 w-3 mr-1" />
             Rejected
           </Badge>
         );
       case 'pending_review':
         return (
           <Badge className="bg-yellow-100 text-yellow-800">
-            <Loader2 className="h-3 w-3 mr-1" />
             Pending
           </Badge>
         );
@@ -247,6 +244,12 @@ export const ScanHistory = () => {
           <span className="text-slate-400 text-sm">-</span>
         );
     }
+  };
+
+  const getConsultantName = (consultantId: string | null) => {
+    if (!consultantId) return 'Not assigned';
+    const consultant = consultants?.find((c: any) => c.user_id === consultantId);
+    return consultant ? (consultant.name || consultant.email) : 'Unknown';
   };
 
   const formatDuration = (startTime: string | null, endTime: string | null) => {
@@ -402,22 +405,12 @@ export const ScanHistory = () => {
                     </td>
                     <td className="py-4 px-4">
                       {scan.reports && scan.reports.length > 0 ? (
-                        <Select 
-                          value={scan.reports[0].consultant_id || 'none'} 
-                          onValueChange={(value) => handleConsultantChange(scan.reports[0].report_id, value)}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select consultant" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {consultants?.map((consultant: any) => (
-                              <SelectItem key={consultant.user_id} value={consultant.user_id}>
-                                {consultant.name || consultant.email}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-slate-400" />
+                          <span className="text-slate-700">
+                            {getConsultantName(scan.reports[0].consultant_id)}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-slate-400 text-sm flex items-center gap-1">
                           <UserCheck className="h-4 w-4" />
