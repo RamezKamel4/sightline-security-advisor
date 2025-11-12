@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, CheckCircle, XCircle } from 'lucide-react';
 import { ReviewReportModal } from './ReviewReportModal';
 import { toast } from 'sonner';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 interface PendingReport {
   report_id: string;
@@ -30,6 +38,8 @@ interface PendingReport {
 export const PendingReports = () => {
   const [selectedReport, setSelectedReport] = useState<PendingReport | null>(null);
   const [modalAction, setModalAction] = useState<'approve' | 'reject' | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const reportsPerPage = 5;
 
   const { data: reports, isLoading, refetch } = useQuery({
     queryKey: ['pending-reports'],
@@ -65,6 +75,11 @@ export const PendingReports = () => {
     );
   }
 
+  const totalPages = Math.ceil((reports?.length || 0) / reportsPerPage);
+  const startIndex = (currentPage - 1) * reportsPerPage;
+  const endIndex = startIndex + reportsPerPage;
+  const paginatedReports = reports?.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6">
       <div>
@@ -86,8 +101,9 @@ export const PendingReports = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {reports.map((report) => (
+        <>
+          <div className="grid gap-4">
+            {paginatedReports?.map((report) => (
             <Card key={report.report_id} className="border-border">
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -131,8 +147,39 @@ export const PendingReports = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
 
       {selectedReport && modalAction && (
