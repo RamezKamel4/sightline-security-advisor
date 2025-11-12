@@ -30,13 +30,18 @@ export const Settings = () => {
     queryKey: ['user-consultant', user?.id],
     queryFn: async () => {
       if (!user) return null;
+      console.log('🔍 Fetching consultant for user:', user.id);
       const { data, error } = await supabase
         .from('users')
         .select('consultant_id')
         .eq('user_id', user.id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching user consultant:', error);
+        throw error;
+      }
+      console.log('✅ User consultant data:', data);
       return data;
     },
     enabled: !!user,
@@ -46,17 +51,29 @@ export const Settings = () => {
   const { data: consultants } = useQuery({
     queryKey: ['consultants-and-admins'],
     queryFn: async () => {
+      console.log('🔍 Fetching consultants and admins...');
+      
       // First, get all user_ids with consultant or admin roles
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['consultant', 'admin']);
       
-      if (roleError) throw roleError;
-      if (!roleData || roleData.length === 0) return [];
+      if (roleError) {
+        console.error('❌ Error fetching roles:', roleError);
+        throw roleError;
+      }
+      
+      console.log('📋 Role data:', roleData);
+      
+      if (!roleData || roleData.length === 0) {
+        console.log('⚠️ No consultants or admins found');
+        return [];
+      }
       
       // Get unique user_ids
       const userIds = [...new Set(roleData.map(r => r.user_id))];
+      console.log('👥 User IDs to fetch:', userIds);
       
       // Then fetch user details
       const { data: userData, error: userError } = await supabase
@@ -64,14 +81,24 @@ export const Settings = () => {
         .select('user_id, email, name')
         .in('user_id', userIds);
       
-      if (userError) throw userError;
+      if (userError) {
+        console.error('❌ Error fetching users:', userError);
+        throw userError;
+      }
+      
+      console.log('✅ Consultants fetched:', userData);
       return userData || [];
     },
   });
 
   useEffect(() => {
+    console.log('📌 Setting consultant ID from userData:', userData);
     if (userData?.consultant_id) {
+      console.log('✅ Setting consultant ID to:', userData.consultant_id);
       setConsultantId(userData.consultant_id);
+    } else {
+      console.log('⚠️ No consultant_id in userData, setting to empty');
+      setConsultantId('');
     }
   }, [userData]);
 
@@ -181,11 +208,14 @@ export const Settings = () => {
             <CardContent className="space-y-6">
               <div>
                 <Label htmlFor="consultant">Your Assigned Consultant</Label>
-                <Select value={consultantId || 'none'} onValueChange={(value) => setConsultantId(value === 'none' ? '' : value)}>
-                  <SelectTrigger className="mt-1">
+                <Select value={consultantId || 'none'} onValueChange={(value) => {
+                  console.log('🎯 Consultant selected:', value);
+                  setConsultantId(value === 'none' ? '' : value);
+                }}>
+                  <SelectTrigger className="mt-1 bg-white">
                     <SelectValue placeholder="Select a consultant" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white z-50">
                     <SelectItem value="none">None</SelectItem>
                     {consultants?.map((consultant: any) => (
                       <SelectItem key={consultant.user_id} value={consultant.user_id}>
@@ -197,6 +227,11 @@ export const Settings = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   Your consultant will review and approve all AI-generated security reports
                 </p>
+                {consultants && consultants.length === 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    ⚠️ No consultants found. Try clicking "Sync User Profiles" below.
+                  </p>
+                )}
               </div>
               <Button 
                 onClick={handleSaveConsultant}
