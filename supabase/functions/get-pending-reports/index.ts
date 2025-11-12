@@ -44,23 +44,10 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all pending reports with client info
+    // Fetch all pending reports
     const { data: reports, error: reportsError } = await supabaseClient
       .from('reports')
-      .select(`
-        *,
-        scans (
-          scan_id,
-          target,
-          start_time,
-          user_id,
-          users (
-            user_id,
-            name,
-            email
-          )
-        )
-      `)
+      .select('*')
       .eq('status', 'pending_review')
       .order('created_at', { ascending: false });
 
@@ -73,6 +60,39 @@ serve(async (req) => {
     }
 
     console.log('Fetched pending reports:', reports?.length || 0);
+
+    // Manually fetch scan and user data for each report
+    if (reports && reports.length > 0) {
+      const enrichedReports = await Promise.all(
+        reports.map(async (report) => {
+          // Fetch scan data
+          const { data: scan } = await supabaseClient
+            .from('scans')
+            .select('scan_id, target, start_time, user_id')
+            .eq('scan_id', report.scan_id)
+            .single();
+
+          // Fetch user data
+          const { data: user } = await supabaseClient
+            .from('users')
+            .select('user_id, name, email')
+            .eq('user_id', scan?.user_id)
+            .single();
+
+          return {
+            ...report,
+            scans: {
+              ...scan,
+              users: user
+            }
+          };
+        })
+      );
+
+      return new Response(JSON.stringify({ reports: enrichedReports }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({ reports }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
