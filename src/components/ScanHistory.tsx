@@ -110,6 +110,7 @@ export const ScanHistory = () => {
     setIsGeneratingReport(scanId);
     try {
       await generateReport(scanId);
+      await fetchScans(); // Refresh to show new report
       toast({
         title: "Report Generated",
         description: "AI-powered security report has been created successfully.",
