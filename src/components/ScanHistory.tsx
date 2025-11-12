@@ -40,6 +40,7 @@ interface Scan {
 export const ScanHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterConsultationStatus, setFilterConsultationStatus] = useState('all');
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
@@ -266,7 +267,18 @@ export const ScanHistory = () => {
   const filteredScans = scans.filter(scan => {
     const matchesSearch = scan.target.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || scan.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    
+    let matchesConsultation = true;
+    if (filterConsultationStatus !== 'all') {
+      const hasReport = scan.reports && scan.reports.length > 0;
+      if (filterConsultationStatus === 'no_report') {
+        matchesConsultation = !hasReport;
+      } else {
+        matchesConsultation = hasReport && scan.reports[0].status === filterConsultationStatus;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesConsultation;
   });
 
   const totalPages = Math.ceil(filteredScans.length / itemsPerPage);
@@ -276,7 +288,7 @@ export const ScanHistory = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterStatus, itemsPerPage]);
+  }, [searchTerm, filterStatus, filterConsultationStatus, itemsPerPage]);
 
   if (loading) {
     return <div className="p-6">Loading scan history...</div>;
@@ -334,6 +346,19 @@ export const ScanHistory = () => {
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="running">Running</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterConsultationStatus} onValueChange={setFilterConsultationStatus}>
+                <SelectTrigger className="w-full sm:w-44">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Consultations</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="pending_review">Pending</SelectItem>
+                  <SelectItem value="no_report">No Report</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={itemsPerPage.toString()} onValueChange={(val) => setItemsPerPage(Number(val))}>
