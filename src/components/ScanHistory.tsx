@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Download, Search, Filter, Eye, Loader2, UserCheck } from 'lucide-react';
+import { FileText, Download, Search, Filter, Eye, Loader2, UserCheck, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScanResults } from './ScanResults';
@@ -33,6 +33,7 @@ interface Scan {
   reports?: {
     report_id: string;
     consultant_id: string | null;
+    status: string;
   }[];
 }
 
@@ -85,7 +86,8 @@ export const ScanHistory = () => {
           *,
           reports (
             report_id,
-            consultant_id
+            consultant_id,
+            status
           )
         `)
         .order('start_time', { ascending: false });
@@ -217,6 +219,36 @@ export const ScanHistory = () => {
     return variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800';
   };
 
+  const getConsultationStatusBadge = (reportStatus: string) => {
+    switch (reportStatus) {
+      case 'approved':
+        return (
+          <Badge className="bg-green-100 text-green-800">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        );
+      case 'rejected':
+        return (
+          <Badge className="bg-red-100 text-red-800">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </Badge>
+        );
+      case 'pending_review':
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800">
+            <Loader2 className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
+      default:
+        return (
+          <span className="text-slate-400 text-sm">-</span>
+        );
+    }
+  };
+
   const formatDuration = (startTime: string | null, endTime: string | null) => {
     if (!startTime || !endTime) return 'N/A';
     const start = new Date(startTime);
@@ -331,6 +363,7 @@ export const ScanHistory = () => {
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Duration</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate-600">Consultation</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Consultant</th>
                   <th className="text-left py-3 px-4 font-medium text-slate-600">Actions</th>
                 </tr>
@@ -359,6 +392,13 @@ export const ScanHistory = () => {
                     </td>
                     <td className="py-4 px-4 text-slate-600">
                       {formatDuration(scan.start_time, scan.end_time)}
+                    </td>
+                    <td className="py-4 px-4">
+                      {scan.reports && scan.reports.length > 0 ? (
+                        getConsultationStatusBadge(scan.reports[0].status)
+                      ) : (
+                        <span className="text-slate-400 text-sm">No report</span>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       {scan.reports && scan.reports.length > 0 ? (
