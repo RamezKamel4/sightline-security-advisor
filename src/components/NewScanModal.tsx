@@ -120,18 +120,18 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="target" className="text-sm font-medium">
-                    Target (IP, Domain, or Range)
+                    Target (Single IP or Domain)
                   </Label>
                   <Input
                     id="target"
-                    placeholder="e.g., 192.168.1.0 or 192.168.1.0/24 or example.com"
+                    placeholder="e.g., 192.168.1.10 or example.com"
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                     className="mt-1"
                     disabled={isLoading}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    IP address, CIDR notation, hostname, or range (e.g., 192.168.1.10-20)
+                    Single IP address or hostname only
                   </p>
                   
                   {/* Target Preview and Validation */}

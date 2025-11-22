@@ -31,31 +31,17 @@ def normalize_target(user_input: str) -> Dict[str, any]:
     if not user_input:
         raise ValueError("Target cannot be empty")
     
-    # Check if it's a CIDR notation
+    # Reject CIDR notation
     if '/' in user_input:
-        return _normalize_cidr(user_input)
+        raise ValueError("CIDR notation not supported. Please provide a single IP address or hostname.")
     
-    # Check if it's an IP range (e.g., 192.168.1.10-192.168.1.20 or 192.168.1.10-20)
-    # Only treat as range if it looks like an IP pattern (starts with digits)
+    # Reject IP ranges
     if '-' in user_input and re.match(r'^\d+\.\d+', user_input):
-        return _normalize_range(user_input)
+        raise ValueError("IP ranges not supported. Please provide a single IP address or hostname.")
     
     # Try to parse as IP address
     try:
         ip = ipaddress.ip_address(user_input)
-        
-        # Special case: IPv4 ending in .0 -> convert to /24
-        if isinstance(ip, ipaddress.IPv4Address) and user_input.endswith('.0'):
-            octets = user_input.split('.')
-            if len(octets) == 4 and octets[3] == '0':
-                cidr = f"{user_input}/24"
-                return {
-                    "original": user_input,
-                    "normalized": cidr,
-                    "hosts_count": 256,
-                    "target_type": "cidr",
-                    "warnings": [f"Converted {user_input} to {cidr} (256 hosts)"]
-                }
         
         # Regular single IP address
         return {
