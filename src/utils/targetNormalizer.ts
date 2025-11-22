@@ -32,15 +32,30 @@ export const previewTargetNormalization = (input: string): NormalizedTarget => {
     };
   }
   
-  // Check for CIDR notation
+  // Reject CIDR notation
   if (trimmed.includes('/')) {
-    return previewCIDR(trimmed);
+    return {
+      original: trimmed,
+      normalized: trimmed,
+      hostsCount: null,
+      targetType: 'cidr',
+      warnings: [],
+      isValid: false,
+      error: 'CIDR notation not supported. Please provide a single IP address or hostname.'
+    };
   }
   
-  // Check for IP range (e.g., 192.168.1.10-192.168.1.20 or 192.168.1.10-20)
-  // Only treat as range if it looks like an IP pattern (starts with digits)
+  // Reject IP ranges
   if (trimmed.includes('-') && /^\d+\.\d+/.test(trimmed)) {
-    return previewRange(trimmed);
+    return {
+      original: trimmed,
+      normalized: trimmed,
+      hostsCount: null,
+      targetType: 'range',
+      warnings: [],
+      isValid: false,
+      error: 'IP ranges not supported. Please provide a single IP address or hostname.'
+    };
   }
   
   // Check if it's an IPv4 address ending in .0
@@ -60,19 +75,6 @@ export const previewTargetNormalization = (input: string): NormalizedTarget => {
         warnings: [],
         isValid: false,
         error: 'Invalid IP address: octets must be 0-255'
-      };
-    }
-    
-    // Special case: .0 address -> convert to /24
-    if (octets[3] === 0) {
-      const cidr = `${trimmed}/24`;
-      return {
-        original: trimmed,
-        normalized: cidr,
-        hostsCount: 256,
-        targetType: 'cidr',
-        warnings: [`Will scan entire /24 subnet (256 hosts)`],
-        isValid: true
       };
     }
     
