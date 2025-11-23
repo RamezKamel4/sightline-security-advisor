@@ -49,6 +49,11 @@ export const ReviewReportModal = ({ report, action, onClose, onSuccess }: Review
 
       if (error) throw error;
 
+      if (action === 'approve') {
+        toast.success('Report approved successfully');
+      } else {
+        toast.success('Report rejected - new version is being generated automatically');
+      }
       onSuccess();
     } catch (error) {
       console.error(`Error ${action}ing report:`, error);

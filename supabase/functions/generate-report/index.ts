@@ -35,9 +35,12 @@ serve(async (req) => {
   }
 
   try {
-    const { scanId } = await req.json();
+    const { scanId, rejectionFeedback } = await req.json();
     
     console.log('Processing report generation for scanId:', scanId);
+    if (rejectionFeedback) {
+      console.log('🔄 Regenerating with consultant feedback:', rejectionFeedback);
+    }
     
     // Get app URL for CVE links (use production URL)
     const appUrl = Deno.env.get('APP_URL') ?? 'https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com';
@@ -151,8 +154,23 @@ serve(async (req) => {
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
     // Generate AI report using Gemini with explicit instructions
-    const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
+    
+    // Add rejection feedback to prompt if provided
+    const feedbackSection = rejectionFeedback ? `
+IMPORTANT - CONSULTANT FEEDBACK FROM PREVIOUS REPORT:
+The previous version of this report was reviewed by a security consultant and rejected for the following reasons:
+"${rejectionFeedback}"
 
+Please address all the concerns raised in the feedback above. Make sure to:
+- Correct any inaccuracies mentioned
+- Add any missing information requested
+- Improve clarity and detail where feedback indicated issues
+- Follow any specific guidance provided by the consultant
+
+` : '';
+
+    const prompt = `You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.
+${feedbackSection}
 SCAN FINDINGS:
 ${findingsSummary}
 
