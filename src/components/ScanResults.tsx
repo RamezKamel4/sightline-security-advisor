@@ -286,7 +286,18 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!report?.pdf_url) return;
+    // Extra safety: never allow download unless report is approved
+    if (!report) {
+      return;
+    }
+
+    if (report.status !== 'approved' || !report.pdf_url) {
+      toast({
+        title: "Report Not Approved",
+        description: "The PDF will be available once the report is approved by a consultant.",
+      });
+      return;
+    }
 
     try {
       const response = await fetch(report.pdf_url);
