@@ -382,7 +382,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               Generate AI Report
             </Button>
           )}
-          {report && report.pdf_url && (
+          {report && report.status === 'approved' && report.pdf_url && (
             <Button variant="outline" onClick={handleDownloadPDF}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF
