@@ -769,7 +769,7 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
                 Report Requires Revision
               </h3>
               <p className="text-red-700 max-w-md mx-auto mb-4">
-                The AI-generated report has been reviewed and requires revision. Our team is working on generating an improved version.
+                The AI-generated report was rejected by the consultant. A new improved version is being generated automatically based on their feedback. Please check back shortly for the updated report.
               </p>
               {report.review_notes && (
                 <div className="bg-white border border-red-200 rounded-lg p-4 max-w-md mx-auto text-left">

@@ -85,8 +85,29 @@ serve(async (req) => {
       });
 
     console.log('Report rejected:', reportId);
+    console.log('🔄 Automatically regenerating report with consultant feedback...');
 
-    return new Response(JSON.stringify({ success: true, report }), {
+    // Automatically regenerate the report with consultant feedback
+    try {
+      const { data: regenerateData, error: regenerateError } = await supabaseClient.functions.invoke('generate-report', {
+        body: { 
+          scanId: report.scan_id,
+          rejectionFeedback: notes 
+        }
+      });
+
+      if (regenerateError) {
+        console.error('❌ Error regenerating report:', regenerateError);
+        // Don't fail the rejection if regeneration fails - just log it
+      } else {
+        console.log('✅ Report regeneration initiated successfully');
+      }
+    } catch (regenerateError) {
+      console.error('❌ Failed to trigger report regeneration:', regenerateError);
+      // Continue - rejection was successful even if regeneration failed
+    }
+
+    return new Response(JSON.stringify({ success: true, report, regenerating: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
