@@ -30,11 +30,11 @@ interface Scan {
   status: string | null;
   start_time: string | null;
   end_time: string | null;
-  reports?: {
+  report?: {
     report_id: string;
     consultant_id: string | null;
     status: string;
-  }[];
+  } | null;
 }
 
 export const ScanHistory = () => {
@@ -86,7 +86,7 @@ export const ScanHistory = () => {
         .from('scans')
         .select(`
           *,
-          reports (
+          report:reports (
             report_id,
             consultant_id,
             status
@@ -275,14 +275,15 @@ export const ScanHistory = () => {
   const filteredScans = scans.filter(scan => {
     const matchesSearch = scan.target.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || scan.status === filterStatus;
+    const report = scan.report;
     
     let matchesConsultation = true;
     if (filterConsultationStatus !== 'all') {
-      const hasReport = scan.reports && scan.reports.length > 0;
+      const hasReport = !!report;
       if (filterConsultationStatus === 'no_report') {
         matchesConsultation = !hasReport;
       } else {
-        matchesConsultation = hasReport && scan.reports[0].status === filterConsultationStatus;
+        matchesConsultation = hasReport && report?.status === filterConsultationStatus;
       }
     }
     
@@ -321,23 +322,23 @@ export const ScanHistory = () => {
             Refresh
           </Button>
           {selectedScans.size > 0 && (
-          <Button 
-            onClick={handleBulkGenerateReports}
-            disabled={isBulkGenerating}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isBulkGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4 mr-2" />
-                Generate {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}
-              </>
-            )}
-          </Button>
+            <Button 
+              onClick={handleBulkGenerateReports}
+              disabled={isBulkGenerating}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isBulkGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Generate {selectedScans.size} Report{selectedScans.size > 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
           )}
         </div>
       </div>
@@ -443,18 +444,18 @@ export const ScanHistory = () => {
                       {formatDuration(scan.start_time, scan.end_time)}
                     </td>
                     <td className="py-4 px-4">
-                      {scan.reports && scan.reports.length > 0 ? (
-                        getConsultationStatusBadge(scan.reports[0].status)
+                      {scan.report ? (
+                        getConsultationStatusBadge(scan.report.status)
                       ) : (
                         <span className="text-slate-400 text-sm">No report</span>
                       )}
                     </td>
                     <td className="py-4 px-4">
-                      {scan.reports && scan.reports.length > 0 ? (
+                      {scan.report ? (
                         <div className="flex items-center gap-2">
                           <UserCheck className="h-4 w-4 text-slate-400" />
                           <span className="text-slate-700">
-                            {getConsultantName(scan.reports[0].consultant_id)}
+                            {getConsultantName(scan.report.consultant_id)}
                           </span>
                         </div>
                       ) : (
@@ -519,8 +520,8 @@ export const ScanHistory = () => {
                     return (
                       <PaginationItem key={pageNum}>
                         <PaginationLink
+                          isActive={pageNum === currentPage}
                           onClick={() => setCurrentPage(pageNum)}
-                          isActive={currentPage === pageNum}
                           className="cursor-pointer"
                         >
                           {pageNum}
@@ -547,7 +548,7 @@ export const ScanHistory = () => {
       </Card>
 
       <Dialog open={!!selectedScanId} onOpenChange={() => setSelectedScanId(null)}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Scan Results</DialogTitle>
           </DialogHeader>
