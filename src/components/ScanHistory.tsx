@@ -548,7 +548,7 @@ export const ScanHistory = () => {
       </Card>
 
       <Dialog open={!!selectedScanId} onOpenChange={() => setSelectedScanId(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Scan Results</DialogTitle>
           </DialogHeader>
