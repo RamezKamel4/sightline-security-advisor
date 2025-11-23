@@ -216,6 +216,9 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
+      console.log('📄 Fetched report:', data);
+      console.log('📊 Report status:', data?.status);
+      console.log('📎 PDF URL:', data?.pdf_url);
       setReport(data);
     } catch (error) {
       console.error('Error fetching report:', error);
@@ -382,12 +385,21 @@ export const ScanResults = ({ scanId }: ScanResultsProps) => {
               Generate AI Report
             </Button>
           )}
-          {report && report.status === 'approved' && report.pdf_url && (
-            <Button variant="outline" onClick={handleDownloadPDF}>
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-          )}
+          {(() => {
+            console.log('🔍 Download button check:', {
+              hasReport: !!report,
+              status: report?.status,
+              hasPdfUrl: !!report?.pdf_url,
+              isApproved: report?.status === 'approved',
+              shouldShow: report && report.status === 'approved' && report.pdf_url
+            });
+            return report && report.status === 'approved' && report.pdf_url && (
+              <Button variant="outline" onClick={handleDownloadPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
