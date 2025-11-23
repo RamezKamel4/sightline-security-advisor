@@ -81,6 +81,7 @@ export const ScanHistory = () => {
 
   const fetchScans = async () => {
     try {
+      console.log('🔍 Fetching scans with reports...');
       const { data, error } = await supabase
         .from('scans')
         .select(`
@@ -93,7 +94,14 @@ export const ScanHistory = () => {
         `)
         .order('start_time', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching scans:', error);
+        throw error;
+      }
+      
+      console.log('✅ Fetched scans:', data?.length || 0);
+      console.log('📊 Sample scan with reports:', data?.[0]);
+      
       setScans((data as any) || []);
     } catch (error) {
       console.error('Error fetching scans:', error);
@@ -301,7 +309,18 @@ export const ScanHistory = () => {
           <h1 className="text-3xl font-bold text-slate-900">Scan History</h1>
           <p className="text-slate-600 mt-1">View and manage your security scans</p>
         </div>
-        {selectedScans.size > 0 && (
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setLoading(true);
+              fetchScans();
+            }}
+            size="sm"
+          >
+            Refresh
+          </Button>
+          {selectedScans.size > 0 && (
           <Button 
             onClick={handleBulkGenerateReports}
             disabled={isBulkGenerating}
@@ -319,7 +338,8 @@ export const ScanHistory = () => {
               </>
             )}
           </Button>
-        )}
+          )}
+        </div>
       </div>
 
       <Card>
