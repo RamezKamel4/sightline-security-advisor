@@ -3,6 +3,9 @@ project_id = "bliwnrikjfzcialoznur"
 [functions.approve-report]
 verify_jwt = true
 
+[functions.check-email-exists]
+verify_jwt = false
+
 [functions.cve-analysis]
 verify_jwt = true
 

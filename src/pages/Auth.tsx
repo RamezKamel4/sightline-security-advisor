@@ -77,6 +77,36 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Check if email exists before attempting signup
+      if (!isLogin && !isResetMode && !isUpdatePasswordMode) {
+        const { data: emailCheckData, error: emailCheckError } = await supabase.functions.invoke(
+          'check-email-exists',
+          {
+            body: { email }
+          }
+        );
+
+        if (emailCheckError) {
+          toast({
+            title: "Validation Error",
+            description: "Unable to verify email availability. Please try again.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (emailCheckData?.exists) {
+          toast({
+            title: "Email Already Registered",
+            description: "This email is already registered. Please sign in instead or use a different email.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       if (isUpdatePasswordMode) {
         // Verify session exists before attempting password update
         if (!user) {
