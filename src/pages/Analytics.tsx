@@ -4,15 +4,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Activity, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const Analytics = () => {
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
+
   // Fetch scan statistics
   const { data: scanStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['scan-analytics'],
+    queryKey: ['scan-analytics', user?.id, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('scans')
-        .select('*');
+      if (!user) return null;
+
+      let query = supabase.from('scans').select('*');
+      
+      // Filter by user_id if not admin
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
 
@@ -63,11 +75,18 @@ const Analytics = () => {
 
   // Fetch vulnerability statistics
   const { data: vulnStats, isLoading: vulnLoading } = useQuery({
-    queryKey: ['vulnerability-stats'],
+    queryKey: ['vulnerability-stats', user?.id, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('findings')
-        .select('*, cve(*)');
+      if (!user) return null;
+
+      // If not admin, we need to filter findings by user's scans
+      let query = supabase.from('findings').select('*, cve(*), scans!inner(user_id)');
+      
+      if (!isAdmin) {
+        query = query.eq('scans.user_id', user.id);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
 
@@ -104,8 +123,12 @@ const Analytics = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Platform Analytics</h1>
-        <p className="text-muted-foreground">Monitor platform usage and scan patterns</p>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {isAdmin ? 'Platform Analytics' : 'My Analytics'}
+        </h1>
+        <p className="text-muted-foreground">
+          {isAdmin ? 'Monitor platform usage and scan patterns' : 'View your scan statistics and vulnerability findings'}
+        </p>
       </div>
 
       {/* Key Metrics */}
