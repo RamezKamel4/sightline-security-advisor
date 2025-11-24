@@ -47,6 +47,13 @@ const App = () => (
                 </Layout>
               </ProtectedRoute>
             } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Layout activeView="">
+                  <Analytics />
+                </Layout>
+              </ProtectedRoute>
+            } />
             <Route path="/admin/users" element={
               <ProtectedRoute>
                 <Layout activeView="">

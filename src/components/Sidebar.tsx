@@ -37,6 +37,7 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Shield, path: '/?view=dashboard' },
     { id: 'history', label: 'Scan History', icon: FileText, path: '/?view=history' },
+    { id: 'analytics', label: 'My Analytics', icon: BarChart3, path: '/analytics' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/?view=settings' },
   ];
 
