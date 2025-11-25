@@ -98,7 +98,6 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
       const { data } = await supabase
         .from('scans')
         .select('scan_id, target, status, start_time')
-        .eq('user_id', user.id)
         .not('start_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(3);
