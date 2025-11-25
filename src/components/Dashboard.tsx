@@ -89,6 +89,8 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
   // Fetch recent scans with findings count
   const { data: recentScans, isLoading: scansLoading } = useQuery({
     queryKey: ['recent-scans'],
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
