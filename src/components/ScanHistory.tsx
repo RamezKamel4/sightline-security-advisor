@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScanResults } from './ScanResults';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { generateReport } from '@/services/scanService';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -34,6 +35,7 @@ interface Scan {
     report_id: string;
     consultant_id: string | null;
     status: string;
+    review_notes?: string | null;
   } | null;
 }
 
@@ -99,7 +101,7 @@ export const ScanHistory = () => {
         (scansData || []).map(async (scan) => {
           const { data: reportData } = await supabase
             .from('reports')
-            .select('report_id, consultant_id, status')
+            .select('report_id, consultant_id, status, review_notes')
             .eq('scan_id', scan.scan_id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -242,7 +244,14 @@ export const ScanHistory = () => {
     return variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800';
   };
 
-  const getConsultationStatusBadge = (reportStatus: string) => {
+  const getConsultationStatusBadge = (scan: Scan) => {
+    if (!scan.report) {
+      return <span className="text-slate-400 text-sm">No report</span>;
+    }
+
+    const reportStatus = scan.report.status;
+    const reviewNotes = scan.report.review_notes;
+
     switch (reportStatus) {
       case 'approved':
         return (
@@ -251,6 +260,23 @@ export const ScanHistory = () => {
           </Badge>
         );
       case 'rejected':
+        if (reviewNotes) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className="bg-red-100 text-red-800 cursor-help">
+                    Rejected
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm font-semibold mb-1">Review Notes:</p>
+                  <p className="text-sm">{reviewNotes}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
         return (
           <Badge className="bg-red-100 text-red-800">
             Rejected
@@ -457,11 +483,7 @@ export const ScanHistory = () => {
                       {formatDuration(scan.start_time, scan.end_time)}
                     </td>
                     <td className="py-4 px-4">
-                      {scan.report ? (
-                        getConsultationStatusBadge(scan.report.status)
-                      ) : (
-                        <span className="text-slate-400 text-sm">No report</span>
-                      )}
+                      {getConsultationStatusBadge(scan)}
                     </td>
                     <td className="py-4 px-4">
                       {scan.report ? (
