@@ -102,6 +102,8 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
         .order('start_time', { ascending: false })
         .limit(3);
 
+      console.log('🔍 Dashboard recent scans raw data:', data);
+
       if (!data) return [];
 
       // Fetch findings count for each scan
