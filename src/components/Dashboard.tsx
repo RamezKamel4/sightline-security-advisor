@@ -97,6 +97,7 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
         .from('scans')
         .select('scan_id, target, status, start_time')
         .eq('user_id', user.id)
+        .not('start_time', 'is', null)
         .order('start_time', { ascending: false })
         .limit(3);
 
