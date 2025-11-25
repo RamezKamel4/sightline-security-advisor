@@ -14,6 +14,7 @@ import CVELookup from "./pages/CVELookup";
 import WorkflowGuide from "./pages/WorkflowGuide";
 import Users from "./pages/Users";
 import Analytics from "./pages/Analytics";
+import MyAnalytics from "./pages/MyAnalytics";
 import SetPassword from "./pages/SetPassword";
 
 const queryClient = new QueryClient();
@@ -50,7 +51,7 @@ const App = () => (
             <Route path="/analytics" element={
               <ProtectedRoute>
                 <Layout activeView="">
-                  <Analytics />
+                  <MyAnalytics />
                 </Layout>
               </ProtectedRoute>
             } />
