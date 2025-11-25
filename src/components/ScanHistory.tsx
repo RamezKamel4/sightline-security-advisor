@@ -81,28 +81,41 @@ export const ScanHistory = () => {
 
   const fetchScans = async () => {
     try {
-      console.log('🔍 Fetching scans with reports...');
-      const { data, error } = await supabase
+      console.log('🔍 Fetching scans with latest reports...');
+      
+      // First, get all scans
+      const { data: scansData, error: scansError } = await supabase
         .from('scans')
-        .select(`
-          *,
-          report:reports (
-            report_id,
-            consultant_id,
-            status
-          )
-        `)
+        .select('*')
         .order('start_time', { ascending: false });
 
-      if (error) {
-        console.error('❌ Error fetching scans:', error);
-        throw error;
+      if (scansError) {
+        console.error('❌ Error fetching scans:', scansError);
+        throw scansError;
       }
+
+      // Then, for each scan, get the latest report
+      const scansWithLatestReports = await Promise.all(
+        (scansData || []).map(async (scan) => {
+          const { data: reportData } = await supabase
+            .from('reports')
+            .select('report_id, consultant_id, status')
+            .eq('scan_id', scan.scan_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          return {
+            ...scan,
+            report: reportData
+          };
+        })
+      );
       
-      console.log('✅ Fetched scans:', data?.length || 0);
-      console.log('📊 Sample scan with reports:', data?.[0]);
+      console.log('✅ Fetched scans with latest reports:', scansWithLatestReports.length);
+      console.log('📊 Sample scan with latest report:', scansWithLatestReports[0]);
       
-      setScans((data as any) || []);
+      setScans(scansWithLatestReports as any);
     } catch (error) {
       console.error('Error fetching scans:', error);
       toast({
