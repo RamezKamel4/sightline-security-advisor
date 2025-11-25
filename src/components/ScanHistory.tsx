@@ -85,10 +85,14 @@ export const ScanHistory = () => {
     try {
       console.log('🔍 Fetching scans with latest reports...');
       
-      // First, get all scans
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      // Get scans for current user only (admins see only their own scans)
       const { data: scansData, error: scansError } = await supabase
         .from('scans')
         .select('*')
+        .eq('user_id', user.id)
         .order('start_time', { ascending: false });
 
       if (scansError) {
