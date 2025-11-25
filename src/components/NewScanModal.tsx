@@ -22,7 +22,6 @@ interface NewScanModalProps {
 export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalProps) => {
   const [target, setTarget] = useState('');
   const [scanProfile, setScanProfile] = useState('');
-  const [schedule, setSchedule] = useState('now');
   const [isLoading, setIsLoading] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [pendingScanData, setPendingScanData] = useState<any>(null);
@@ -62,7 +61,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
     const scanData = {
       target,
       scanProfile,
-      schedule,
     };
 
     // Show permission modal before starting
@@ -85,7 +83,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
       // Reset form
       setTarget('');
       setScanProfile('');
-      setSchedule('now');
       setPendingScanData(null);
       
       onScanCreated?.();
@@ -187,25 +184,6 @@ export const NewScanModal = ({ isOpen, onClose, onScanCreated }: NewScanModalPro
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Schedule</Label>
-                <Select value={schedule} onValueChange={setSchedule}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="now">Run Now</SelectItem>
-                    <SelectItem value="daily">Daily at Current Time</SelectItem>
-                    <SelectItem value="weekly">Weekly at Current Time</SelectItem>
-                    <SelectItem value="monthly">Monthly at Current Time</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>

@@ -17,7 +17,6 @@ export const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [autoSchedule, setAutoSchedule] = useState(false);
   const [reportEmail, setReportEmail] = useState('admin@company.com');
   const [scanTimeout, setScanTimeout] = useState('60');
   const [consultantId, setConsultantId] = useState<string>('');
@@ -224,19 +223,6 @@ export const Settings = () => {
                 <p className="text-xs text-slate-600 mt-1">
                   Primary email for receiving scan reports and alerts
                 </p>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-medium">Auto-Schedule Scans</Label>
-                  <div className="text-sm text-slate-600">
-                    Automatically schedule recurring scans for saved targets
-                  </div>
-                </div>
-                <Switch
-                  checked={autoSchedule}
-                  onCheckedChange={setAutoSchedule}
-                />
               </div>
             </CardContent>
           </Card>

@@ -7,7 +7,6 @@ export interface ScanRequest {
   scanProfile: string;
   username?: string;
   password?: string;
-  schedule: string;
 }
 
 export const createScan = async (scanData: ScanRequest): Promise<string> => {
@@ -22,52 +21,7 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 
   console.log('✅ User authenticated:', user.id);
 
-  // Check if this is a scheduled scan
-  if (scanData.schedule !== 'now') {
-    console.log(`📅 Creating scheduled scan (${scanData.schedule})`);
-    
-    // Calculate first run time based on current time
-    const now = new Date();
-    const scheduledTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
-    
-    // Calculate next_run_at based on frequency
-    let nextRunAt = new Date(now);
-    switch (scanData.schedule) {
-      case 'daily':
-        nextRunAt.setDate(nextRunAt.getDate() + 1);
-        break;
-      case 'weekly':
-        nextRunAt.setDate(nextRunAt.getDate() + 7);
-        break;
-      case 'monthly':
-        nextRunAt.setMonth(nextRunAt.getMonth() + 1);
-        break;
-    }
-    
-    const { data: scheduledScan, error: scheduleError } = await supabase
-      .from('scheduled_scans')
-      .insert({
-        user_id: user.id,
-        target: scanData.target,  // Use original input
-        profile: scanData.scanProfile,
-        frequency: scanData.schedule,
-        scheduled_time: scheduledTime,
-        next_run_at: nextRunAt.toISOString(),
-        is_active: true,
-      })
-      .select()
-      .single();
-    
-    if (scheduleError) {
-      console.error('❌ Error creating scheduled scan:', scheduleError);
-      throw new Error(`Failed to schedule scan: ${scheduleError.message}`);
-    }
-    
-    console.log('✅ Scheduled scan created:', scheduledScan.id);
-    return scheduledScan.id;
-  }
-
-  // For "now" scans, create and execute immediately
+  // Create and execute scan immediately
   console.log('💾 Creating scan record in database...');
   
   // Store both original and normalized target
