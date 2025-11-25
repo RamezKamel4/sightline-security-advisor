@@ -21,20 +21,41 @@ const SetPassword = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isRecoverySession, setIsRecoverySession] = useState(false);
 
   useEffect(() => {
-    // Check if user is already authenticated
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // If already logged in, redirect to home
+    // Listen for password recovery events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoverySession(true);
+        setVerifying(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        // If user successfully signs in after setting password, redirect
         navigate('/');
       }
+    });
+
+    // Check if there's a recovery token in the URL
+    const checkRecoveryToken = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      
+      if (type === 'recovery') {
+        setIsRecoverySession(true);
+      }
+      
+      setVerifying(false);
     };
-    checkAuth();
+
+    checkRecoveryToken();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,10 +76,12 @@ const SetPassword = () => {
 
       toast({
         title: 'Success',
-        description: 'Password set successfully. You can now login.',
+        description: 'Password set successfully. Redirecting to login...',
       });
 
-      // Redirect to login after a short delay
+      // Sign out and redirect to login
+      await supabase.auth.signOut();
+      
       setTimeout(() => {
         navigate('/auth');
       }, 1500);
@@ -82,6 +105,39 @@ const SetPassword = () => {
       setLoading(false);
     }
   };
+
+  if (verifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Verifying your link...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isRecoverySession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Invalid or Expired Link</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              This password reset link is invalid or has expired. Please request a new one.
+            </p>
+            <Button onClick={() => navigate('/auth')} className="w-full">
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20 p-4">

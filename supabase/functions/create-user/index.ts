@@ -82,10 +82,15 @@ Deno.serve(async (req) => {
       newUser = createdUser;
     }
 
-    // Determine the correct redirect URL based on environment
+    // Determine the correct redirect URL dynamically from the request origin
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/');
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const projectId = supabaseUrl.split('//')[1]?.split('.')[0];
-    const redirectUrl = `https://${projectId}.lovableproject.com/set-password`;
+    
+    // Use the origin if available, otherwise fall back to production URL
+    const redirectUrl = origin 
+      ? `${origin}/set-password`
+      : `https://${projectId}.lovableproject.com/set-password`;
     
     console.log('Redirect URL for password setup:', redirectUrl);
     
