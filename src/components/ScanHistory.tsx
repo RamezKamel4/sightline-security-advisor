@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Download, Search, Filter, Eye, Loader2, UserCheck, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { ScanResults } from './ScanResults';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -52,6 +53,7 @@ export const ScanHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch all consultants and admins
   const { data: consultants } = useQuery({
@@ -79,14 +81,18 @@ export const ScanHistory = () => {
 
   useEffect(() => {
     fetchScans();
-  }, []);
-
+  }, [user]);
+ 
   const fetchScans = async () => {
     try {
       console.log('🔍 Fetching scans with latest reports...');
       
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        console.warn('❌ No authenticated user found when fetching scans');
+        setScans([]);
+        setLoading(false);
+        return;
+      }
       
       console.log('🔐 Current user ID:', user.id);
       console.log('🔐 Current user email:', user.email);
@@ -100,12 +106,12 @@ export const ScanHistory = () => {
       
       console.log('📊 Scans returned for user:', scansData?.length);
       console.log('📋 First scan sample:', scansData?.[0]);
-
+ 
       if (scansError) {
         console.error('❌ Error fetching scans:', scansError);
         throw scansError;
       }
-
+ 
       // Then, for each scan, get the latest report
       const scansWithLatestReports = await Promise.all(
         (scansData || []).map(async (scan) => {
@@ -116,7 +122,7 @@ export const ScanHistory = () => {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-
+ 
           return {
             ...scan,
             report: reportData
