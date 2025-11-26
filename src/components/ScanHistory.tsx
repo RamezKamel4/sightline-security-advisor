@@ -88,12 +88,18 @@ export const ScanHistory = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
+      console.log('🔐 Current user ID:', user.id);
+      console.log('🔐 Current user email:', user.email);
+      
       // Get scans for current user only (admins see only their own scans)
       const { data: scansData, error: scansError } = await supabase
         .from('scans')
         .select('*')
         .eq('user_id', user.id)
         .order('start_time', { ascending: false });
+      
+      console.log('📊 Scans returned for user:', scansData?.length);
+      console.log('📋 First scan sample:', scansData?.[0]);
 
       if (scansError) {
         console.error('❌ Error fetching scans:', scansError);
