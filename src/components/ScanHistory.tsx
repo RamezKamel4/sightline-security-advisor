@@ -103,18 +103,24 @@ export const ScanHistory = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('start_time', { ascending: false });
-      
-      console.log('📊 Scans returned for user:', scansData?.length);
-      console.log('📋 First scan sample:', scansData?.[0]);
  
       if (scansError) {
         console.error('❌ Error fetching scans:', scansError);
         throw scansError;
       }
  
+      const rawScans = scansData || [];
+      console.log('📊 Scans returned from DB (before user filter):', rawScans.length);
+      console.log('📋 First raw scan sample:', rawScans[0]);
+ 
+      // Extra safety: also filter by user_id on the client, so admins never see other users' scans
+      const userScans = rawScans.filter((scan: any) => scan.user_id === user.id);
+      console.log('📊 Scans after filtering by current user_id:', userScans.length);
+      console.log('📋 First user scan sample:', userScans[0]);
+ 
       // Then, for each scan, get the latest report
       const scansWithLatestReports = await Promise.all(
-        (scansData || []).map(async (scan) => {
+        userScans.map(async (scan) => {
           const { data: reportData } = await supabase
             .from('reports')
             .select('report_id, consultant_id, status, review_notes')
