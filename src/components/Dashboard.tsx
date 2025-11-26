@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ScanResults } from './ScanResults';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardProps {
   onNewScan: () => void;
@@ -14,6 +15,7 @@ interface DashboardProps {
 
 export const Dashboard = ({ onNewScan }: DashboardProps) => {
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const { user } = useAuth();
   
   // Fetch dashboard statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -88,7 +90,7 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
 
   // Fetch recent scans with findings count
   const { data: recentScans, isLoading: scansLoading } = useQuery({
-    queryKey: ['recent-scans'],
+    queryKey: ['recent-scans', user?.id],
     staleTime: 0,
     refetchOnMount: 'always',
     queryFn: async () => {
