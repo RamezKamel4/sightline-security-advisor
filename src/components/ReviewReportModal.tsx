@@ -95,13 +95,21 @@ export const ReviewReportModal = ({ report, action, onClose, onSuccess }: Review
 
           {report.pdf_url && (
             <div>
-              <Button
-                variant="outline"
-                onClick={() => window.open(report.pdf_url!, '_blank')}
+              <a
+                href={report.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
                 className="w-full"
               >
-                View PDF Report
-              </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  type="button"
+                >
+                  View PDF Report
+                </Button>
+              </a>
             </div>
           )}
 
