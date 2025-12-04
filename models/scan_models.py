@@ -12,7 +12,7 @@ class ScanRequest(BaseModel):
     @field_validator('ip_address')
     @classmethod
     def validate_ip_address(cls, v: str) -> str:
-        """Validate IP address or CIDR notation"""
+        """Validate IP address, CIDR notation, or domain name"""
         v = v.strip()
         
         # Check for CIDR notation
@@ -23,46 +23,36 @@ class ScanRequest(BaseModel):
             except ValueError:
                 raise ValueError(f"Invalid CIDR notation: {v}")
         
-        # Check for single IP or IP range
+        # Check for single IP
         try:
             ipaddress.ip_address(v)
             return v
         except ValueError:
-            # Check if it's a simple range like 192.168.1.1-10
-            if '-' in v:
-                parts = v.split('-')
-                if len(parts) == 2:
-                    base = parts[0].strip()
-                    try:
-                        ipaddress.ip_address(base)
-                        # Basic validation - range should be numeric
-                        if parts[1].strip().isdigit():
-                            return v
-                    except ValueError:
-                        pass
-            
-            raise ValueError(f"Invalid IP address format: {v}. Use single IP (192.168.1.1), CIDR (192.168.1.0/24), or range (192.168.1.1-10)")
+            pass
+        
+        # Check if it's a simple range like 192.168.1.1-10
+        if '-' in v and not v.startswith('-'):
+            parts = v.split('-')
+            if len(parts) == 2:
+                base = parts[0].strip()
+                try:
+                    ipaddress.ip_address(base)
+                    if parts[1].strip().isdigit():
+                        return v
+                except ValueError:
+                    pass
+        
+        # Check for valid domain name (allow scanme.nmap.org, etc.)
+        domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
+        if re.match(domain_pattern, v) and '.' in v and len(v) <= 253:
+            return v
+        
+        raise ValueError(f"Invalid target format: {v}. Use IP (192.168.1.1), CIDR (192.168.1.0/24), range (192.168.1.1-10), or domain (example.com)")
     
     @field_validator('nmap_args')
     @classmethod
     def validate_nmap_args(cls, v: str) -> str:
         """Validate nmap arguments - whitelist safe arguments only"""
-        # Whitelist of safe nmap arguments
-        safe_patterns = [
-            r'-T[0-5]',           # Timing template
-            r'-p[\d,-]+',         # Port specification
-            r'-sV',               # Service version detection
-            r'-O',                # OS detection
-            r'-A',                # Aggressive scan (OS, version, script, traceroute)
-            r'-Pn',               # Skip host discovery
-            r'-n',                # No DNS resolution
-            r'--top-ports\s+\d+', # Top ports
-            r'--min-rate\s+\d+',  # Minimum packet rate
-            r'--max-retries\s+\d+', # Maximum retries
-            r'-v+',               # Verbosity
-            r'--version-intensity\s+[0-9]', # Version detection intensity
-        ]
-        
         # Dangerous patterns that should never be allowed
         dangerous_patterns = [
             r'--script',          # Custom script execution
@@ -81,14 +71,45 @@ class ScanRequest(BaseModel):
             if re.search(pattern, v, re.IGNORECASE):
                 raise ValueError(f"Unsafe nmap argument detected: matches pattern '{pattern}'")
         
-        # Validate each argument against whitelist
+        # Safe argument patterns (standalone or with values)
+        safe_args = {
+            '-T0', '-T1', '-T2', '-T3', '-T4', '-T5',  # Timing
+            '-sV', '-O', '-A', '-Pn', '-n',             # Common flags
+            '-v', '-vv', '-vvv',                        # Verbosity
+        }
+        
+        # Safe arguments that take a value
+        safe_value_args = {'-p', '--top-ports', '--min-rate', '--max-retries', '--version-intensity'}
+        
         args = v.split()
-        for arg in args:
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            
             if not arg:
+                i += 1
                 continue
             
-            # Allow if matches any safe pattern
-            if any(re.match(f'^{pattern}$', arg, re.IGNORECASE) for pattern in safe_patterns):
+            # Check standalone safe args
+            if arg in safe_args:
+                i += 1
+                continue
+            
+            # Check args that take values (like -p 80,443)
+            if arg in safe_value_args:
+                i += 1  # Skip the value
+                if i < len(args):
+                    i += 1
+                continue
+            
+            # Check combined args like -p80,443
+            if any(arg.startswith(prefix) for prefix in ['-p', '-T']):
+                i += 1
+                continue
+            
+            # Check if it looks like a port list (could be after -p)
+            if re.match(r'^[\d,\-]+$', arg):
+                i += 1
                 continue
             
             raise ValueError(f"Nmap argument not allowed: '{arg}'. Only safe scanning arguments are permitted.")
