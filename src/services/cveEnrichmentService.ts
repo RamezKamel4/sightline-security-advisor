@@ -54,47 +54,59 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
   // For each finding, query NVD API for CVEs
   for (const finding of findings) {
     try {
+      // GATING: Skip CVE lookup if no version detected
+      const version = finding.service_version?.trim() || '';
+      const hasVersion = version && 
+                         version.toLowerCase() !== 'unknown' && 
+                         version !== '';
+      
+      if (!hasVersion) {
+        console.log(`🚫 Skipping CVE enrichment for ${finding.service_name} - no version detected`);
+        continue;
+      }
+      
       // Build smart search query for NVD
       // If service_version contains a product name (e.g., "Apache httpd 2.4.7"), use it directly
       // Otherwise combine service_name and service_version
       let searchQuery = '';
       
-      if (finding.service_version && finding.service_version !== 'unknown') {
-        // Check if service_version already contains a recognizable product name
-        const productPatterns = [
-          /^(Apache\s+(?:httpd|Tomcat))\s+(\d+[\d.]*)/i,
-          /^(nginx)\s+(\d+[\d.]*)/i,
-          /^(Microsoft\s+IIS)\s+(\d+[\d.]*)/i,
-          /^(OpenSSH)[_\s]+(\d+[\d.]*)/i,
-          /^(lighttpd)\s+(\d+[\d.]*)/i,
-          /^(Eclipse\s+Jetty)\s+(\d+[\d.]*)/i,
-        ];
-        
-        let matched = false;
-        for (const pattern of productPatterns) {
-          const match = finding.service_version.match(pattern);
-          if (match) {
-            // Use the extracted product and version directly
-            searchQuery = `${match[1]} ${match[2]}`;
-            matched = true;
-            break;
+      // Check if service_version already contains a recognizable product name
+      const productPatterns = [
+        /^(Apache\s+(?:httpd|Tomcat))\s+(\d+[\d.]*)/i,
+        /^(nginx)\s+(\d+[\d.]*)/i,
+        /^(Microsoft\s+IIS)\s+(\d+[\d.]*)/i,
+        /^(OpenSSH)[_\s]+(\d+[\d.]*)/i,
+        /^(lighttpd)\s+(\d+[\d.]*)/i,
+        /^(Eclipse\s+Jetty)\s+(\d+[\d.]*)/i,
+        /^(apache_httpd)\s+(\d+[\d.]*)/i,  // Handle underscore variant
+      ];
+      
+      let matched = false;
+      for (const pattern of productPatterns) {
+        const match = version.match(pattern);
+        if (match) {
+          // Normalize product name for better NVD search
+          let product = match[1];
+          if (product.toLowerCase() === 'apache_httpd') {
+            product = 'Apache httpd';
           }
+          searchQuery = `${product} ${match[2]}`;
+          matched = true;
+          break;
         }
-        
-        if (!matched) {
-          // Fallback: if service_version looks like "product version", use it directly
-          // Otherwise combine service_name with service_version
-          if (/^[a-zA-Z]/.test(finding.service_version) && /\d/.test(finding.service_version)) {
-            searchQuery = finding.service_version;
-          } else {
-            searchQuery = `${finding.service_name} ${finding.service_version}`;
-          }
-        }
-      } else {
-        searchQuery = finding.service_name;
       }
       
-      console.log(`🔎 Querying NVD for: "${searchQuery}" (from service: ${finding.service_name}, version: ${finding.service_version || 'unknown'})`);
+      if (!matched) {
+        // Fallback: if service_version looks like "product version", use it directly
+        // Otherwise combine service_name with service_version
+        if (/^[a-zA-Z]/.test(version) && /\d/.test(version)) {
+          searchQuery = version;
+        } else {
+          searchQuery = `${finding.service_name} ${version}`;
+        }
+      }
+      
+      console.log(`🔎 Querying NVD for: "${searchQuery}" (from service: ${finding.service_name}, version: ${version})`);
 
       // Call nvd-proxy edge function with keywordSearch parameter
       const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
