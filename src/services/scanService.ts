@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { executeScan, type ScanResult } from './scanApi';
+import { executeScan, type ScanResult, type CVEInfo } from './scanApi';
 
 export interface ScanRequest {
   target: string;
@@ -118,21 +118,53 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
   console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.host}:${r.port}/${r.service} (${r.state})`).join(', '));
   
-  const findingsToInsert = scanResults.map(result => ({
-    scan_id: scanId,
-    host: result.host,
-    port: result.port,
-    state: result.state,
-    service_name: result.service,
-    service_version: result.version || 'unknown',
-    cve_id: null,  // CVE enrichment will happen during report generation
-    confidence: (result as any).confidence || 0,
-    raw_banner: (result as any).raw_banner || null,
-    headers: (result as any).headers || null,
-    tls_info: (result as any).tls_info || null,
-    proxy_detection: (result as any).proxy_detection || null,
-    detection_methods: (result as any).detection_methods || null,
-  }));
+  // First, store any CVEs from the backend
+  const cveMap = new Map<string, string>(); // Maps finding key to cve_id
+  
+  for (const result of scanResults) {
+    if (result.cves && result.cves.length > 0) {
+      const bestCve = result.cves[0]; // Take the first/most relevant CVE
+      console.log(`💾 Storing CVE ${bestCve.cve_id} for ${result.service} ${result.version}`);
+      
+      // Upsert CVE into the cve table
+      const { error: cveError } = await supabase
+        .from('cve')
+        .upsert({
+          cve_id: bestCve.cve_id,
+          title: bestCve.title || `${bestCve.cve_id}`,
+          description: bestCve.description || 'No description available',
+          cvss_score: bestCve.cvss_score,
+          confidence: bestCve.confidence || 'high'
+        }, { onConflict: 'cve_id' });
+      
+      if (cveError) {
+        console.error(`❌ Error storing CVE ${bestCve.cve_id}:`, cveError);
+      } else {
+        console.log(`✅ CVE ${bestCve.cve_id} stored successfully`);
+        cveMap.set(`${result.host}:${result.port}`, bestCve.cve_id);
+      }
+    }
+  }
+  
+  // Now store findings with CVE references
+  const findingsToInsert = scanResults.map(result => {
+    const cveId = cveMap.get(`${result.host}:${result.port}`) || null;
+    return {
+      scan_id: scanId,
+      host: result.host,
+      port: result.port,
+      state: result.state,
+      service_name: result.service,
+      service_version: result.version || 'unknown',
+      cve_id: cveId,
+      confidence: result.confidence || 0,
+      raw_banner: result.raw_banner || null,
+      headers: result.headers || null,
+      tls_info: result.tls_info || null,
+      proxy_detection: result.proxy_detection || null,
+      detection_methods: result.detection_methods || null,
+    };
+  });
 
   const { data, error: findingError } = await supabase
     .from('findings')
@@ -145,6 +177,9 @@ const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise
   }
   
   console.log('✅ Successfully stored', data?.length || 0, 'findings');
+  if (cveMap.size > 0) {
+    console.log(`🎯 ${cveMap.size} findings linked to CVEs from backend`);
+  }
 };
 
 // Re-export report generation for backwards compatibility

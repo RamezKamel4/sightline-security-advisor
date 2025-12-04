@@ -41,6 +41,14 @@ export interface HostInfo {
   hostnames?: string[];
 }
 
+export interface CVEInfo {
+  cve_id: string;
+  title: string;
+  description: string;
+  cvss_score: number | null;
+  confidence?: string;
+}
+
 export interface ScanResult {
   host: string;
   port: number;
@@ -48,7 +56,13 @@ export interface ScanResult {
   service: string;
   version: string;
   cpes?: string[];
-  cves?: any[];
+  cves?: CVEInfo[];
+  confidence?: number;
+  raw_banner?: string;
+  headers?: Record<string, string>;
+  tls_info?: Record<string, any>;
+  proxy_detection?: Record<string, any>;
+  detection_methods?: Record<string, any>;
 }
 
 export interface TargetInfo {
