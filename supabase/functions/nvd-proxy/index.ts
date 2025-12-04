@@ -177,10 +177,55 @@ serve(async (req) => {
       console.log('⚠️ Skipping results - query contains "unknown" version');
       filteredVulnerabilities = [];
     } else if (filteredVulnerabilities.length > 0) {
-      // Extract service name and version from keywordSearch
-      const searchParts = keywordSearch?.split(' ') || [];
-      const serviceName = searchParts[0]?.toLowerCase();
-      const version = searchParts.slice(1).join(' ').toLowerCase();
+      // Smart extraction of product name and version from keywordSearch
+      // Handle formats like "Apache httpd 2.4.7", "nginx 1.18.0", "OpenSSH 8.2p1"
+      let serviceName = '';
+      let version = '';
+      
+      // Product name patterns (handles multi-word product names)
+      const productPatterns = [
+        /^(Apache\s+httpd)\s+(\d+[\d.p]*)/i,
+        /^(Apache\s+Tomcat)\s+(\d+[\d.]*)/i,
+        /^(Microsoft\s+IIS)\s+(\d+[\d.]*)/i,
+        /^(Eclipse\s+Jetty)\s+(\d+[\d.]*)/i,
+        /^(nginx)\s+(\d+[\d.]*)/i,
+        /^(OpenSSH)[_\s]+(\d+[\d.p]*)/i,
+        /^(lighttpd)\s+(\d+[\d.]*)/i,
+        /^(\w+)\s+(\d+[\d.]*)/i,  // Generic fallback: word + version
+      ];
+      
+      if (keywordSearch) {
+        let matched = false;
+        for (const pattern of productPatterns) {
+          const match = keywordSearch.match(pattern);
+          if (match) {
+            serviceName = match[1].toLowerCase().replace(/\s+/g, '_');
+            version = match[2].toLowerCase();
+            console.log(`📦 Extracted product: "${serviceName}", version: "${version}" from "${keywordSearch}"`);
+            matched = true;
+            break;
+          }
+        }
+        
+        if (!matched) {
+          // Fallback to simple split
+          const searchParts = keywordSearch.split(' ');
+          serviceName = searchParts[0]?.toLowerCase() || '';
+          version = searchParts.slice(1).join(' ').toLowerCase();
+        }
+      }
+      
+      // Normalize product names for CPE matching
+      const cpeProductMap: Record<string, string[]> = {
+        'apache_httpd': ['apache', 'httpd', 'http_server'],
+        'apache_tomcat': ['tomcat'],
+        'microsoft_iis': ['iis', 'internet_information_services'],
+        'eclipse_jetty': ['jetty'],
+        'openssh': ['openssh'],
+      };
+      
+      // Get all possible CPE product names for matching
+      const productVariants = cpeProductMap[serviceName] || [serviceName];
       
       // Filter and score vulnerabilities with proper version range validation
       filteredVulnerabilities = filteredVulnerabilities.map((vuln: any) => {
@@ -200,8 +245,12 @@ serve(async (req) => {
             for (const cpeMatch of node.cpeMatch || []) {
               const cpeCriteria = (cpeMatch.criteria || '').toLowerCase();
               
-              // Precise product matching
-              if (serviceName && cpeCriteria.includes(`:${serviceName}:`)) {
+              // Check all product name variants for matching
+              const matchesProduct = productVariants.some(variant => 
+                cpeCriteria.includes(`:${variant}:`)
+              );
+              
+              if (serviceName && matchesProduct) {
                 hasProductMatch = true;
                 
                 if (version) {

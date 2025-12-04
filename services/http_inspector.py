@@ -29,12 +29,16 @@ def parse_server_header(server_header: str) -> Tuple[Optional[str], Optional[str
     if not server_header:
         return None, None
     
-    # Normalize product names
+    # Keep human-readable product names for display AND NVD keyword searches
     product_map = {
-        "apache": "apache_httpd",
-        "httpd": "apache_httpd",
-        "microsoft-iis": "iis",
-        "iis": "iis",
+        "apache": "Apache httpd",
+        "httpd": "Apache httpd",
+        "microsoft-iis": "Microsoft IIS",
+        "iis": "Microsoft IIS",
+        "nginx": "nginx",
+        "lighttpd": "lighttpd",
+        "tomcat": "Apache Tomcat",
+        "jetty": "Eclipse Jetty",
     }
     
     # Try to match product/version pattern
