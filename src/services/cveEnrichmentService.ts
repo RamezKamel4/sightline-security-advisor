@@ -54,12 +54,47 @@ export const enrichFindingsWithCVE = async (scanId: string): Promise<void> => {
   // For each finding, query NVD API for CVEs
   for (const finding of findings) {
     try {
-      console.log(`🔎 Querying NVD for: ${finding.service_name} ${finding.service_version || ''}`);
+      // Build smart search query for NVD
+      // If service_version contains a product name (e.g., "Apache httpd 2.4.7"), use it directly
+      // Otherwise combine service_name and service_version
+      let searchQuery = '';
       
-      // Build search query for NVD
-      const searchQuery = finding.service_version 
-        ? `${finding.service_name} ${finding.service_version}`
-        : finding.service_name;
+      if (finding.service_version && finding.service_version !== 'unknown') {
+        // Check if service_version already contains a recognizable product name
+        const productPatterns = [
+          /^(Apache\s+(?:httpd|Tomcat))\s+(\d+[\d.]*)/i,
+          /^(nginx)\s+(\d+[\d.]*)/i,
+          /^(Microsoft\s+IIS)\s+(\d+[\d.]*)/i,
+          /^(OpenSSH)[_\s]+(\d+[\d.]*)/i,
+          /^(lighttpd)\s+(\d+[\d.]*)/i,
+          /^(Eclipse\s+Jetty)\s+(\d+[\d.]*)/i,
+        ];
+        
+        let matched = false;
+        for (const pattern of productPatterns) {
+          const match = finding.service_version.match(pattern);
+          if (match) {
+            // Use the extracted product and version directly
+            searchQuery = `${match[1]} ${match[2]}`;
+            matched = true;
+            break;
+          }
+        }
+        
+        if (!matched) {
+          // Fallback: if service_version looks like "product version", use it directly
+          // Otherwise combine service_name with service_version
+          if (/^[a-zA-Z]/.test(finding.service_version) && /\d/.test(finding.service_version)) {
+            searchQuery = finding.service_version;
+          } else {
+            searchQuery = `${finding.service_name} ${finding.service_version}`;
+          }
+        }
+      } else {
+        searchQuery = finding.service_name;
+      }
+      
+      console.log(`🔎 Querying NVD for: "${searchQuery}" (from service: ${finding.service_name}, version: ${finding.service_version || 'unknown'})`);
 
       // Call nvd-proxy edge function with keywordSearch parameter
       const nvdUrl = `https://bliwnrikjfzcialoznur.supabase.co/functions/v1/nvd-proxy?keywordSearch=${encodeURIComponent(searchQuery)}`;
