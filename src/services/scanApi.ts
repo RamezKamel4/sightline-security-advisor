@@ -42,10 +42,10 @@ export interface HostInfo {
 }
 
 export interface CVEInfo {
-  cve_id: string;
+  id: string;  // Backend uses "id" not "cve_id"
   title: string;
   description: string;
-  cvss_score: number | null;
+  cvss: number | null;  // Backend uses "cvss" not "cvss_score"
   confidence?: string;
 }
 

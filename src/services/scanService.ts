@@ -118,30 +118,42 @@ export const createScan = async (scanData: ScanRequest): Promise<string> => {
 const storeFindings = async (scanId: string, scanResults: ScanResult[]): Promise<void> => {
   console.log('📝 Preparing to store findings:', scanResults.map(r => `${r.host}:${r.port}/${r.service} (${r.state})`).join(', '));
   
-  // First, store any CVEs from the backend
+  // First, store any CVEs from the backend (only for services WITH versions)
   const cveMap = new Map<string, string>(); // Maps finding key to cve_id
   
   for (const result of scanResults) {
+    // GATING: Only store CVEs if service has a detected version
+    const hasVersion = result.version && 
+                       result.version.toLowerCase() !== 'unknown' && 
+                       result.version.trim() !== '';
+    
+    if (!hasVersion) {
+      console.log(`🚫 Skipping CVE storage for ${result.service} - no version detected`);
+      continue;
+    }
+    
     if (result.cves && result.cves.length > 0) {
       const bestCve = result.cves[0]; // Take the first/most relevant CVE
-      console.log(`💾 Storing CVE ${bestCve.cve_id} for ${result.service} ${result.version}`);
+      const cveId = bestCve.id; // Backend uses "id" not "cve_id"
+      
+      console.log(`💾 Storing CVE ${cveId} for ${result.service} ${result.version}`);
       
       // Upsert CVE into the cve table
       const { error: cveError } = await supabase
         .from('cve')
         .upsert({
-          cve_id: bestCve.cve_id,
-          title: bestCve.title || `${bestCve.cve_id}`,
+          cve_id: cveId,
+          title: bestCve.title || cveId,
           description: bestCve.description || 'No description available',
-          cvss_score: bestCve.cvss_score,
+          cvss_score: bestCve.cvss, // Backend uses "cvss" not "cvss_score"
           confidence: bestCve.confidence || 'high'
         }, { onConflict: 'cve_id' });
       
       if (cveError) {
-        console.error(`❌ Error storing CVE ${bestCve.cve_id}:`, cveError);
+        console.error(`❌ Error storing CVE ${cveId}:`, cveError);
       } else {
-        console.log(`✅ CVE ${bestCve.cve_id} stored successfully`);
-        cveMap.set(`${result.host}:${result.port}`, bestCve.cve_id);
+        console.log(`✅ CVE ${cveId} stored successfully`);
+        cveMap.set(`${result.host}:${result.port}`, cveId);
       }
     }
   }
