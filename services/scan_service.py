@@ -184,6 +184,9 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
             print(f"🔓 Host {host}: Found {len(tcp_ports)} TCP ports with states: {list(tcp_ports.keys())}")
 
             for port, port_info in tcp_ports.items():
+                # DEBUG: Print raw port_info to see exactly what nmap returns
+                print(f"🔍 DEBUG RAW port_info for port {port}: {port_info}")
+                
                 port_state = port_info.get('state', 'unknown')
                 service_name = port_info.get('name', 'unknown')
                 product = port_info.get('product', '').strip()
@@ -194,7 +197,8 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 search_service_name = product or service_name
                 search_version = version_str or "unknown"
 
-                print(f"🔍 Port {port} ({port_state}): {service_name} - {display_version}")
+                # DEBUG: Explicit state verification
+                print(f"✅ Port {port} STATE='{port_state}' | Service={service_name} | Version={display_version}")
 
                 # Enhanced service detection for HTTP/HTTPS services with gated CVE lookup
                 probe_data = {}
