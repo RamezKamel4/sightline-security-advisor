@@ -109,18 +109,29 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
 
       if (!data) return [];
 
-      // Fetch findings count for each scan
+      // Fetch findings with CVSS scores for each scan
       const scansWithFindings = await Promise.all(
         data.map(async (scan) => {
           const { data: findings } = await supabase
             .from('findings')
-            .select('cve_id', { count: 'exact' })
+            .select(`
+              cve_id,
+              cve:cve_id (
+                cvss_score
+              )
+            `)
             .eq('scan_id', scan.scan_id)
             .not('cve_id', 'is', null);
 
+          // Extract CVSS scores from findings
+          const cvssScores = findings
+            ?.filter((f: any) => f.cve?.cvss_score)
+            .map((f: any) => f.cve.cvss_score) || [];
+
           return {
             ...scan,
-            findingsCount: findings?.length || 0
+            findingsCount: findings?.length || 0,
+            cvssScores
           };
         })
       );
@@ -145,17 +156,31 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
     return `px-2 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`;
   };
 
-  const getRiskBadge = (findingsCount: number) => {
-    // Simple risk calculation based on findings count
-    if (findingsCount >= 5) return 'bg-red-100 text-red-800';
-    if (findingsCount >= 2) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-green-100 text-green-800';
-  };
-
-  const getRiskLevel = (findingsCount: number) => {
-    if (findingsCount >= 5) return 'high';
-    if (findingsCount >= 2) return 'medium';
-    return 'low';
+  const getRiskLevel = (cvssScores: number[]) => {
+    // No CVEs found - Secure
+    if (cvssScores.length === 0) {
+      return { level: 'secure', color: 'bg-green-100 text-green-800' };
+    }
+    
+    // Calculate average and max CVSS scores (same logic as ScanResults)
+    const avgCvss = cvssScores.reduce((sum, score) => sum + score, 0) / cvssScores.length;
+    const maxCvss = Math.max(...cvssScores);
+    
+    // Apply CVSS-based thresholds
+    if (maxCvss >= 9.0 || avgCvss >= 9.0) {
+      return { level: 'critical', color: 'bg-purple-100 text-purple-800' };
+    }
+    if (avgCvss >= 7.0) {
+      return { level: 'high', color: 'bg-red-100 text-red-800' };
+    }
+    if (avgCvss >= 4.0) {
+      return { level: 'medium', color: 'bg-yellow-100 text-yellow-800' };
+    }
+    if (avgCvss > 0.0) {
+      return { level: 'low', color: 'bg-orange-100 text-orange-800' };
+    }
+    
+    return { level: 'secure', color: 'bg-green-100 text-green-800' };
   };
 
   const formatDate = (dateString: string | null) => {
@@ -216,9 +241,14 @@ export const Dashboard = ({ onNewScan }: DashboardProps) => {
                       <p className="text-sm text-slate-600">{formatDate(scan.start_time)}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskBadge(scan.findingsCount || 0)}`}>
-                        {getRiskLevel(scan.findingsCount || 0)}
-                      </span>
+                      {(() => {
+                        const risk = getRiskLevel(scan.cvssScores || []);
+                        return (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${risk.color}`}>
+                            {risk.level}
+                          </span>
+                        );
+                      })()}
                       <span className={getStatusBadge(scan.status || 'unknown')}>{scan.status}</span>
                     </div>
                   </div>
