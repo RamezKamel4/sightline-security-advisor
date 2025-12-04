@@ -12,8 +12,11 @@ class ScanRequest(BaseModel):
     @field_validator('ip_address')
     @classmethod
     def validate_ip_address(cls, v: str) -> str:
-        """Validate IP address, CIDR notation, or domain name"""
+        """Validate IP address, CIDR notation, range, or domain name"""
         v = v.strip()
+        
+        if not v:
+            raise ValueError("Target cannot be empty")
         
         # Check for CIDR notation
         if '/' in v:
@@ -42,7 +45,7 @@ class ScanRequest(BaseModel):
                 except ValueError:
                     pass
         
-        # Check for valid domain name (allow scanme.nmap.org, etc.)
+        # Check for valid domain name (allow scanme.nmap.org, example.com, etc.)
         domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
         if re.match(domain_pattern, v) and '.' in v and len(v) <= 253:
             return v
@@ -71,15 +74,14 @@ class ScanRequest(BaseModel):
             if re.search(pattern, v, re.IGNORECASE):
                 raise ValueError(f"Unsafe nmap argument detected: matches pattern '{pattern}'")
         
-        # Safe argument patterns (standalone or with values)
-        safe_args = {
-            '-T0', '-T1', '-T2', '-T3', '-T4', '-T5',  # Timing
-            '-sV', '-O', '-A', '-Pn', '-n',             # Common flags
-            '-v', '-vv', '-vvv',                        # Verbosity
+        # Safe standalone flags
+        safe_flags = {
+            '-sV', '-O', '-A', '-Pn', '-n', '-sS', '-sT', '-sU', '-sN', '-sF', '-sX',
+            '-v', '-vv', '-vvv', '-F', '--open', '-r',
         }
         
         # Safe arguments that take a value
-        safe_value_args = {'-p', '--top-ports', '--min-rate', '--max-retries', '--version-intensity'}
+        safe_value_args = {'-p', '-T', '--top-ports', '--min-rate', '--max-retries', '--version-intensity'}
         
         args = v.split()
         i = 0
@@ -90,27 +92,38 @@ class ScanRequest(BaseModel):
                 i += 1
                 continue
             
-            # Check standalone safe args
-            if arg in safe_args:
+            # Check standalone safe flags
+            if arg in safe_flags:
+                i += 1
+                continue
+            
+            # Check timing flags -T0 through -T5
+            if re.match(r'^-T[0-5]$', arg):
+                i += 1
+                continue
+            
+            # Check combined port arg like -p80,443
+            if arg.startswith('-p') and len(arg) > 2:
                 i += 1
                 continue
             
             # Check args that take values (like -p 80,443)
             if arg in safe_value_args:
-                i += 1  # Skip the value
+                i += 1  # Move past the flag
                 if i < len(args):
-                    i += 1
+                    i += 1  # Skip the value
                 continue
             
-            # Check combined args like -p80,443
-            if any(arg.startswith(prefix) for prefix in ['-p', '-T']):
-                i += 1
-                continue
-            
-            # Check if it looks like a port list (could be after -p)
+            # Check if it looks like a port list (could be value after -p)
             if re.match(r'^[\d,\-]+$', arg):
                 i += 1
                 continue
+            
+            # Check other safe value args with attached values
+            for prefix in ['--top-ports', '--min-rate', '--max-retries', '--version-intensity']:
+                if arg.startswith(prefix + '='):
+                    i += 1
+                    continue
             
             raise ValueError(f"Nmap argument not allowed: '{arg}'. Only safe scanning arguments are permitted.")
         
