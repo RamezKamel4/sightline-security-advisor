@@ -204,6 +204,24 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                 status = "info"
                 recommendations = []
                 
+                # Initialize service_data for ALL ports (not just HTTP)
+                service_data = {
+                    "host": host,
+                    "port": port,
+                    "state": port_state,
+                    "service": service_name,
+                    "version": display_version,
+                    "cves": [],
+                    "confidence": 50.0,
+                    "raw_banner": "",
+                    "headers": {},
+                    "tls_info": {},
+                    "proxy_detection": {},
+                    "detection_methods": {"sources": ["nmap"]},
+                    "status": status,
+                    "recommendations": []
+                }
+                
                 if port_state == "open" and port in [80, 443, 8000, 8080, 8443, 3000, 5000, 9000]:
                     print(f"🔬 Performing HTTP verification on {host}:{port}...")
                     
@@ -285,39 +303,35 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                             print(f"⚠️ Conflicts detected: {merged['conflicts']}")
                     
                     print(f"📋 Final detection: product={final_product}, version={final_version}, status={status}")
-                
-                # Build detection methods list
-                detection_methods = probe_data.get('detection_methods', ['nmap']) if probe_data else ['nmap']
-                if evidence:
-                    if evidence.get('evidence_sources'):
-                        detection_methods.extend(evidence['evidence_sources'])
-                
-                # Build evidence dict for storage
-                evidence_data = {
-                    "sources": list(set(detection_methods)),
-                    "http_headers": evidence.get('http_headers', {}),
-                    "tls_info": evidence.get('tls_info', {}),
-                    "redirect_to_https": evidence.get('redirect_to_https', False),
-                    "confidence_level": evidence.get('confidence', 'low'),
-                    "recommendations": recommendations
-                }
-                
-                service_data = {
-                    "host": host,
-                    "port": port,
-                    "state": port_state,
-                    "service": service_name,
-                    "version": display_version,
-                    "cves": [],
-                    "confidence": probe_data.get('confidence', 50.0) if probe_data else 50.0,
-                    "raw_banner": probe_data.get('raw_banner', ''),
-                    "headers": evidence.get('http_headers', probe_data.get('headers', {})),
-                    "tls_info": evidence.get('tls_info', probe_data.get('tls_info', {})),
-                    "proxy_detection": probe_data.get('proxy_detection', {}),
-                    "detection_methods": evidence_data,
-                    "status": status,
-                    "recommendations": recommendations
-                }
+                    
+                    # Build detection methods list
+                    detection_methods = probe_data.get('detection_methods', ['nmap']) if probe_data else ['nmap']
+                    if evidence:
+                        if evidence.get('evidence_sources'):
+                            detection_methods.extend(evidence['evidence_sources'])
+                    
+                    # Build evidence dict for storage
+                    evidence_data = {
+                        "sources": list(set(detection_methods)),
+                        "http_headers": evidence.get('http_headers', {}),
+                        "tls_info": evidence.get('tls_info', {}),
+                        "redirect_to_https": evidence.get('redirect_to_https', False),
+                        "confidence_level": evidence.get('confidence', 'low'),
+                        "recommendations": recommendations
+                    }
+                    
+                    # Update service_data with HTTP-specific info
+                    service_data.update({
+                        "version": display_version,
+                        "confidence": probe_data.get('confidence', 50.0) if probe_data else 50.0,
+                        "raw_banner": probe_data.get('raw_banner', ''),
+                        "headers": evidence.get('http_headers', probe_data.get('headers', {})),
+                        "tls_info": evidence.get('tls_info', probe_data.get('tls_info', {})),
+                        "proxy_detection": probe_data.get('proxy_detection', {}),
+                        "detection_methods": evidence_data,
+                        "status": status,
+                        "recommendations": recommendations
+                    })
 
                 # GATED CVE ENRICHMENT
                 # Only fetch CVEs when we have high confidence (product + version)
@@ -349,13 +363,14 @@ def perform_network_scan(ip_address: str, nmap_args: str, scan_profile: str, fol
                         print(f"🚫 GATED CVE LOOKUP: Skipping {search_service_name} - no version (avoiding false positives)")
                         service_data["cves"] = []
                         service_data["status"] = "unconfirmed"
-                        if "Server detected but version unknown" not in recommendations:
+                        if "Server detected but version unknown" not in str(service_data.get("recommendations", [])):
                             service_data["recommendations"].append(
                                 f"Product '{search_service_name}' detected but version unknown. "
                                 "CVE lookup skipped to prevent false positives. "
                                 "Run authenticated scan or check server configuration for precise version."
                             )
 
+                # Append service_data for ALL ports (moved outside the HTTP block)
                 results.append(service_data)
 
         print(f"✅ Scan completed successfully")
