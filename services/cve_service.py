@@ -257,10 +257,16 @@ def fetch_cves_for_service(
                 if has_version_match:
                     break
             
-            if has_product_match and not has_version_match:
+            # STRICT GATING: If we have a version but no version match, skip this CVE
+            # This prevents false positives like showing CVE for Apache 2.2.9 when scanning 2.4.7
+            if version and version.lower() != "unknown":
+                if not has_version_match:
+                    print(f"  ❌ Skipping {cve_id}: no version match for {version}")
+                    continue
+            elif has_product_match and not has_version_match:
                 confidence = "medium"
                 
-            # Skip old CVEs if confidence is not high
+            # Skip very old CVEs if confidence is not high
             if confidence != "high" and year < 2010:
                 continue
             
