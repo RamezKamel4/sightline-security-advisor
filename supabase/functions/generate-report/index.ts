@@ -45,13 +45,13 @@ serve(async (req) => {
     // Get app URL for CVE links (use production URL)
     const appUrl = Deno.env.get('APP_URL') ?? 'https://2f7ebd3f-a3b3-449b-94ac-f2a2c2d67068.lovableproject.com';
     
-    // Get Gemini API key
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    // Get Lovable API key for AI Gateway
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
-    if (!geminiApiKey) {
-      console.error('Gemini API key not found');
+    if (!lovableApiKey) {
+      console.error('Lovable API key not found');
       return new Response(JSON.stringify({ 
-        error: 'Gemini API key not configured' 
+        error: 'Lovable API key not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -243,45 +243,45 @@ DO NOT include any "Raw Tool Outputs" section
 
 Generate the complete report now.`;
 
-    console.log('Making Gemini API request with retry logic...');
+    console.log('Making Lovable AI Gateway request with retry logic...');
 
-    let geminiResponse;
+    let aiResponse;
     let lastError;
     const maxRetries = 3;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Attempt ${attempt}/${maxRetries} to call Gemini API...`);
+        console.log(`Attempt ${attempt}/${maxRetries} to call Lovable AI Gateway...`);
         
-        geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
+        aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-goog-api-key': geminiApiKey,
+            'Authorization': `Bearer ${lovableApiKey}`,
           },
           body: JSON.stringify({
-            contents: [{
-              parts: [{ text: prompt }]
-            }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 16384,
-            }
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are an AI security assistant generating professional vulnerability scan reports for SMBs and IT consultants.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 16384,
           }),
         });
 
-        console.log('Gemini response status:', geminiResponse.status);
+        console.log('Lovable AI Gateway response status:', aiResponse.status);
 
         // Success - break out of retry loop
-        if (geminiResponse.ok) {
+        if (aiResponse.ok) {
           break;
         }
 
         // Handle retryable errors (503 Service Unavailable, 429 Rate Limit)
-        if (geminiResponse.status === 503 || geminiResponse.status === 429) {
-          const errorText = await geminiResponse.text();
+        if (aiResponse.status === 503 || aiResponse.status === 429) {
+          const errorText = await aiResponse.text();
           lastError = errorText;
-          console.error(`Gemini API error (attempt ${attempt}/${maxRetries}) - Status:`, geminiResponse.status);
+          console.error(`Lovable AI Gateway error (attempt ${attempt}/${maxRetries}) - Status:`, aiResponse.status);
           console.error('Error response:', errorText);
           
           // Don't retry on last attempt
@@ -291,14 +291,25 @@ Generate the complete report now.`;
             await new Promise(resolve => setTimeout(resolve, delayMs));
             continue;
           }
+        } else if (aiResponse.status === 402) {
+          // Payment required - credits exhausted
+          const errorText = await aiResponse.text();
+          console.error('Lovable AI Gateway - Credits exhausted:', errorText);
+          return new Response(JSON.stringify({ 
+            error: 'AI credits exhausted',
+            details: 'Please add more credits to your Lovable workspace to continue generating reports.'
+          }), {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         } else {
           // Non-retryable error
-          const errorText = await geminiResponse.text();
-          console.error('Gemini API error - Status:', geminiResponse.status);
-          console.error('Gemini API error - Response:', errorText);
+          const errorText = await aiResponse.text();
+          console.error('Lovable AI Gateway error - Status:', aiResponse.status);
+          console.error('Lovable AI Gateway error - Response:', errorText);
           
           return new Response(JSON.stringify({ 
-            error: `Gemini API error (${geminiResponse.status})`,
+            error: `AI Gateway error (${aiResponse.status})`,
             details: errorText
           }), {
             status: 500,
@@ -318,10 +329,10 @@ Generate the complete report now.`;
     }
 
     // If we exhausted all retries
-    if (!geminiResponse || !geminiResponse.ok) {
+    if (!aiResponse || !aiResponse.ok) {
       console.error('Failed after all retry attempts');
       return new Response(JSON.stringify({ 
-        error: 'Gemini API is temporarily unavailable',
+        error: 'AI service is temporarily unavailable',
         details: 'The AI service is overloaded. Please try again in a few minutes.',
         technicalDetails: lastError
       }), {
@@ -330,13 +341,13 @@ Generate the complete report now.`;
       });
     }
 
-    const aiData = await geminiResponse.json();
-    console.log('Gemini response received successfully');
+    const aiData = await aiResponse.json();
+    console.log('Lovable AI Gateway response received successfully');
     
-    if (!aiData.candidates || !aiData.candidates[0] || !aiData.candidates[0].content) {
-      console.error('Unexpected Gemini response structure:', aiData);
+    if (!aiData.choices || !aiData.choices[0] || !aiData.choices[0].message) {
+      console.error('Unexpected AI response structure:', aiData);
       return new Response(JSON.stringify({ 
-        error: 'Unexpected response from Gemini API',
+        error: 'Unexpected response from AI Gateway',
         details: 'Response structure was not as expected'
       }), {
         status: 500,
@@ -344,7 +355,7 @@ Generate the complete report now.`;
       });
     }
     
-    let reportContent = aiData.candidates[0].content.parts[0].text;
+    let reportContent = aiData.choices[0].message.content;
     console.log('AI report generated successfully, length:', reportContent.length);
     
     // Remove any preamble text that starts with common phrases
@@ -578,7 +589,7 @@ Generate the complete report now.`;
         report_id: reportData.report_id,
         action: 'generated',
         performed_by: scan.user_id,
-        notes: 'AI report generated by Gemini'
+        notes: 'AI report generated by Lovable AI Gateway (google/gemini-2.5-flash)'
       });
 
     return new Response(JSON.stringify({ 
