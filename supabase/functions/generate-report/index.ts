@@ -193,7 +193,7 @@ serve(async (req) => {
 
 ## 6. EMERGING CRITICAL THREATS ADVISORY
 
-⚠️ **IMPORTANT SECURITY ADVISORY**
+[WARNING] **IMPORTANT SECURITY ADVISORY**
 
 The following critical vulnerabilities have been recently disclosed and affect modern web applications. While these cannot be detected through network scanning alone, your organization should be aware of them if running affected technologies.
 
@@ -448,6 +448,21 @@ Generate the complete report now.`;
 `;
     
     reportContent = metadata + reportContent;
+
+    // Sanitize content for PDF - remove emojis and special Unicode characters
+    // WinAnsi encoding only supports basic Latin characters
+    const sanitizeForPdf = (text: string): string => {
+      return text
+        // Remove emoji and other non-ASCII characters that WinAnsi can't encode
+        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '') // Emojis
+        .replace(/[\u{2600}-\u{26FF}]/gu, '[!]') // Miscellaneous symbols (includes ⚠)
+        .replace(/[\u{2700}-\u{27BF}]/gu, '') // Dingbats
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '') // Variation selectors
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '') // Extended symbols
+        .replace(/[^\x00-\x7F]/g, ''); // Remove any remaining non-ASCII characters
+    };
+    
+    reportContent = sanitizeForPdf(reportContent);
 
     // Generate PDF
     console.log('Generating PDF...');
