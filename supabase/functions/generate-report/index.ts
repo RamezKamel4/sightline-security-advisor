@@ -28,6 +28,25 @@ interface Finding {
   cve_id: string | null;
 }
 
+// Emerging Critical Threats Advisory Configuration
+// These are critical vulnerabilities that cannot be detected via traditional scanning
+// but should be included as advisories when relevant services are detected
+const EMERGING_CRITICAL_THREATS = [
+  {
+    cve_id: 'CVE-2025-55182',
+    name: 'React2Shell',
+    cvss_score: 10.0,
+    severity: 'CRITICAL',
+    affected_technology: 'React Server Components (RSC) in React 19.x and Next.js 15.x',
+    trigger_services: ['http', 'https', 'http-alt', 'https-alt', 'http-proxy', 'upnp'],
+    description: 'Pre-authentication Remote Code Execution vulnerability in React Server Components allowing attackers to execute arbitrary code on the server without authentication.',
+    detection_note: 'Cannot be detected via network scanning - requires application-layer inspection',
+    recommendation: 'If using React 19.x or Next.js 15.x with Server Components, immediately verify your versions and update to patched releases. Audit all RSC implementations for potential exposure.',
+    reference: 'https://nvd.nist.gov/vuln/detail/CVE-2025-55182'
+  }
+  // Future emerging threats can be added here
+];
+
 serve(async (req) => {
   
   if (req.method === 'OPTIONS') {
@@ -153,6 +172,46 @@ serve(async (req) => {
         }).join('\n')
       : 'No vulnerabilities found - all scanned services appear to be secure.';
 
+    // Detect web services to determine if we should include emerging threats advisory
+    const webServiceNames = ['http', 'https', 'http-alt', 'https-alt', 'http-proxy', 'upnp', 'ssl', 'ssl/http'];
+    const detectedServices = findings?.map(f => f.service_name?.toLowerCase()) || [];
+    const hasWebServices = detectedServices.some(s => webServiceNames.includes(s));
+    
+    console.log('Web services detected:', hasWebServices, '- Services:', detectedServices.join(', '));
+
+    // Build Emerging Critical Threats Advisory section if web services are detected
+    let emergingThreatsSection = '';
+    if (hasWebServices) {
+      const relevantThreats = EMERGING_CRITICAL_THREATS.filter(threat => 
+        threat.trigger_services.some(ts => detectedServices.includes(ts))
+      );
+      
+      if (relevantThreats.length > 0) {
+        console.log('Including emerging threats advisory for:', relevantThreats.map(t => t.cve_id).join(', '));
+        
+        emergingThreatsSection = `
+
+## 6. EMERGING CRITICAL THREATS ADVISORY
+
+⚠️ **IMPORTANT SECURITY ADVISORY**
+
+The following critical vulnerabilities have been recently disclosed and affect modern web applications. While these cannot be detected through network scanning alone, your organization should be aware of them if running affected technologies.
+
+${relevantThreats.map(threat => `
+### ${threat.cve_id} - ${threat.name} (CVSS: ${threat.cvss_score} ${threat.severity})
+
+- **Affected Technology:** ${threat.affected_technology}
+- **Risk:** ${threat.description}
+- **Detection Note:** ${threat.detection_note}
+- **Immediate Action Required:** ${threat.recommendation}
+- **Reference:** ${threat.reference}
+`).join('\n')}
+
+**Note:** This advisory section is included proactively because web services were detected during the scan. These vulnerabilities require application-layer inspection and cannot be confirmed through network scanning. Please verify if your organization uses the affected technologies.
+`;
+      }
+    }
+
     // Generate AI report using Gemini with explicit instructions
     
     // Add rejection feedback to prompt if provided
@@ -232,7 +291,7 @@ Include technical details:
 - Open ports discovered
 - Service banners and versions detected
 DO NOT include any "Raw Tool Outputs" section
-
+${emergingThreatsSection}
 ## STYLE REQUIREMENTS:
 - Write in professional, client-ready language
 - Executive Summary and Vulnerability Details must avoid technical jargon
@@ -240,6 +299,7 @@ DO NOT include any "Raw Tool Outputs" section
 - Summaries must be short, impactful, and actionable
 - Technical Appendix can include detailed technical information
 - Use bullet points and clear section headers for easy PDF conversion
+${emergingThreatsSection ? '- The Emerging Critical Threats Advisory section should be clearly marked as an advisory, not a confirmed finding' : ''}
 
 Generate the complete report now.`;
 
