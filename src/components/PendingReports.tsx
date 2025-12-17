@@ -4,9 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, CheckCircle } from 'lucide-react';
 import { ReviewReportModal } from './ReviewReportModal';
-import { toast } from 'sonner';
 import {
   Pagination,
   PaginationContent,
@@ -37,7 +36,6 @@ interface PendingReport {
 
 export const PendingReports = () => {
   const [selectedReport, setSelectedReport] = useState<PendingReport | null>(null);
-  const [modalAction, setModalAction] = useState<'approve' | 'reject' | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const reportsPerPage = 5;
 
@@ -51,18 +49,15 @@ export const PendingReports = () => {
     },
   });
 
-  const handleOpenModal = (report: PendingReport, action: 'approve' | 'reject') => {
+  const handleOpenModal = (report: PendingReport) => {
     setSelectedReport(report);
-    setModalAction(action);
   };
 
   const handleCloseModal = () => {
     setSelectedReport(null);
-    setModalAction(null);
   };
 
   const handleSuccess = () => {
-    toast.success('Report review submitted successfully');
     refetch();
     handleCloseModal();
   };
@@ -125,26 +120,15 @@ export const PendingReports = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenModal(report, 'approve')}
-                    className="gap-2"
-                  >
-                    <Eye className="h-4 w-4" />
-                    View & Approve
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleOpenModal(report, 'reject')}
-                    className="gap-2"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Reject
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenModal(report)}
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  View Report
+                </Button>
               </CardContent>
             </Card>
             ))}
@@ -182,10 +166,9 @@ export const PendingReports = () => {
         </>
       )}
 
-      {selectedReport && modalAction && (
+      {selectedReport && (
         <ReviewReportModal
           report={selectedReport}
-          action={modalAction}
           onClose={handleCloseModal}
           onSuccess={handleSuccess}
         />
