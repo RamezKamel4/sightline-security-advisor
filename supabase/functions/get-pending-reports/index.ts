@@ -12,6 +12,7 @@ serve(async (req) => {
   }
 
   try {
+    // Use anon key for auth check
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -20,6 +21,12 @@ serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
+    );
+    
+    // Use service role for data fetching (bypasses RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Verify user is a consultant
@@ -44,8 +51,8 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all pending reports
-    const { data: reports, error: reportsError } = await supabaseClient
+    // Fetch all pending reports using service role (bypasses RLS)
+    const { data: reports, error: reportsError } = await supabaseAdmin
       .from('reports')
       .select('*')
       .eq('status', 'pending_review')
@@ -65,26 +72,30 @@ serve(async (req) => {
     if (reports && reports.length > 0) {
       const enrichedReports = await Promise.all(
         reports.map(async (report) => {
-          // Fetch scan data
-          const { data: scan } = await supabaseClient
+          // Fetch scan data using service role
+          const { data: scan } = await supabaseAdmin
             .from('scans')
             .select('scan_id, target, start_time, user_id')
             .eq('scan_id', report.scan_id)
-            .single();
+            .maybeSingle();
 
-          // Fetch user data
-          const { data: user } = await supabaseClient
-            .from('users')
-            .select('user_id, name, email')
-            .eq('user_id', scan?.user_id)
-            .single();
+          // Fetch user data using service role
+          let userData = null;
+          if (scan?.user_id) {
+            const { data: user } = await supabaseAdmin
+              .from('users')
+              .select('user_id, name, email')
+              .eq('user_id', scan.user_id)
+              .maybeSingle();
+            userData = user;
+          }
 
           return {
             ...report,
-            scans: {
+            scans: scan ? {
               ...scan,
-              users: user
-            }
+              users: userData
+            } : null
           };
         })
       );
