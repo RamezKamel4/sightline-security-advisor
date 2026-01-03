@@ -21,17 +21,17 @@ interface PendingReport {
   created_at: string;
   summary: string;
   pdf_url: string | null;
-  scans: {
+  scans?: {
     scan_id: string;
     target: string;
     start_time: string;
     user_id: string;
-    users: {
+    users?: {
       user_id: string;
       name: string;
       email: string;
     };
-  };
+  } | null;
 }
 
 export const PendingReports = () => {
@@ -104,12 +104,12 @@ export const PendingReports = () => {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1 flex-1">
                     <CardTitle className="text-xl">
-                      Report for {report.scans.target}
+                      Report for {report.scans?.target || 'Unknown Target'}
                     </CardTitle>
                     <CardDescription>
                       <div className="space-y-1">
-                        <p><strong>Client:</strong> {report.scans.users.name} ({report.scans.users.email})</p>
-                        <p><strong>Scan Date:</strong> {new Date(report.scans.start_time).toLocaleString()}</p>
+                        <p><strong>Client:</strong> {report.scans?.users?.name || 'Unknown'} ({report.scans?.users?.email || 'N/A'})</p>
+                        <p><strong>Scan Date:</strong> {report.scans?.start_time ? new Date(report.scans.start_time).toLocaleString() : 'N/A'}</p>
                         <p><strong>Generated:</strong> {new Date(report.created_at).toLocaleString()}</p>
                       </div>
                     </CardDescription>

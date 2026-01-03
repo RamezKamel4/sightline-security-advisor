@@ -14,13 +14,13 @@ interface ReviewReportModalProps {
     scan_id: string;
     summary: string;
     pdf_url: string | null;
-    scans: {
+    scans?: {
       target: string;
-      users: {
+      users?: {
         name: string;
         email: string;
-      };
-    };
+      } | null;
+    } | null;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -87,7 +87,7 @@ export const ReviewReportModal = ({ report, onClose, onSuccess }: ReviewReportMo
               Review Report
             </DialogTitle>
             <DialogDescription>
-              Target: {report.scans.target} | Client: {report.scans.users.name} ({report.scans.users.email})
+              Target: {report.scans?.target || 'Unknown'} | Client: {report.scans?.users?.name || 'Unknown'} ({report.scans?.users?.email || 'N/A'})
             </DialogDescription>
           </DialogHeader>
 
