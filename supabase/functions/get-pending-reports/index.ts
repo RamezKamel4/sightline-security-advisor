@@ -43,20 +43,31 @@ serve(async (req) => {
       .select('role')
       .eq('user_id', user.id);
 
-    const isConsultant = roles?.some(r => r.role === 'consultant' || r.role === 'admin');
-    if (!isConsultant) {
+    const isAdmin = roles?.some(r => r.role === 'admin');
+    const isConsultant = roles?.some(r => r.role === 'consultant');
+    
+    if (!isAdmin && !isConsultant) {
       return new Response(JSON.stringify({ error: 'Only consultants can view pending reports' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Fetch all pending reports using service role (bypasses RLS)
-    const { data: reports, error: reportsError } = await supabaseAdmin
+    console.log(`User ${user.id} (admin: ${isAdmin}, consultant: ${isConsultant}) fetching pending reports`);
+
+    // Build query - admins see all, consultants see only assigned
+    let reportsQuery = supabaseAdmin
       .from('reports')
       .select('*')
       .eq('status', 'pending_review')
       .order('created_at', { ascending: false });
+
+    // Consultants only see reports assigned to them
+    if (!isAdmin) {
+      reportsQuery = reportsQuery.eq('consultant_id', user.id);
+    }
+
+    const { data: reports, error: reportsError } = await reportsQuery;
 
     if (reportsError) {
       console.error('Error fetching pending reports:', reportsError);
